@@ -22,6 +22,7 @@ type connector struct {
 	handler         Handler
 	responseHandler any
 	cfg             *config.Config
+	cdc             cdc.Connector
 	esClient        *es.Client
 }
 
@@ -39,7 +40,7 @@ func NewConnector(ctx context.Context, cfg config.Config, handler Handler, optio
 	if err != nil {
 		return nil, err
 	}
-
+	esConnector.cdc = pqCDC
 	esConnector.cfg.CDC = *pqCDC.GetConfig()
 
 	esClient, err := elasticsearch.NewClient(esConnector.cfg)
