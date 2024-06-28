@@ -15,7 +15,7 @@ func ChunkWithSize[T any](slice []T, chunkSize int) [][]T {
 	return chunks
 }
 
-func ChunkSlice[T any](slice []T, chunks int) [][]T {
+func Chunk[T any](slice []T, chunks int) [][]T {
 	maxChunkSize := ((len(slice) - 1) / chunks) + 1
 	numFullChunks := chunks - (maxChunkSize*chunks - len(slice))
 
