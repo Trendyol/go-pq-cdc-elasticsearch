@@ -4,10 +4,13 @@ import (
 	"context"
 	cdc "github.com/Trendyol/go-pq-cdc"
 	"github.com/Trendyol/go-pq-cdc-elasticsearch/config"
+	"github.com/Trendyol/go-pq-cdc-elasticsearch/elasticsearch"
 	"github.com/Trendyol/go-pq-cdc/logger"
+	es "github.com/elastic/go-elasticsearch/v7"
+
 	"github.com/Trendyol/go-pq-cdc/pq/message/format"
 	"github.com/Trendyol/go-pq-cdc/pq/replication"
-	"os"
+	"github.com/go-playground/errors"
 )
 
 type Connector interface {
@@ -19,9 +22,7 @@ type connector struct {
 	handler         Handler
 	responseHandler any
 	cfg             *config.Config
-
-	cancelCh chan os.Signal
-	readyCh  chan struct{}
+	esClient        *es.Client
 }
 
 func NewConnector(ctx context.Context, cfg config.Config, handler Handler, options ...Option) (Connector, error) {
@@ -34,12 +35,18 @@ func NewConnector(ctx context.Context, cfg config.Config, handler Handler, optio
 
 	Options(options).Apply(esConnector)
 
-	pqCDC, err := cdc.NewConnector(ctx, cfg.CDC, esConnector.listener)
+	pqCDC, err := cdc.NewConnector(ctx, esConnector.cfg.CDC, esConnector.listener)
 	if err != nil {
 		return nil, err
 	}
 
-	cfg.CDC = *pqCDC.GetConfig()
+	esConnector.cfg.CDC = *pqCDC.GetConfig()
+
+	esClient, err := elasticsearch.NewClient(esConnector.cfg)
+	if err != nil {
+		return nil, errors.Wrap(err, "elasticsearch new client")
+	}
+	esConnector.esClient = esClient
 
 	return esConnector, nil
 }
