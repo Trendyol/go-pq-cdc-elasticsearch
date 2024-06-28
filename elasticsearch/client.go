@@ -7,7 +7,7 @@ import (
 	"math"
 )
 
-func NewElasticClient(config *config.Config) (*elasticsearch.Client, error) {
+func NewClient(config *config.Config) (*elasticsearch.Client, error) {
 	return elasticsearch.NewClient(elasticsearch.Config{
 		MaxRetries:            math.MaxInt,
 		Addresses:             config.Elasticsearch.URLs,
