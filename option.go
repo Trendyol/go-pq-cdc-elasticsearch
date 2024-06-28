@@ -1,6 +1,9 @@
 package cdc
 
-import "github.com/prometheus/client_golang/prometheus"
+import (
+	"github.com/Trendyol/go-pq-cdc/logger"
+	"github.com/prometheus/client_golang/prometheus"
+)
 
 type Option func(Connector)
 
@@ -20,6 +23,12 @@ func WithResponseHandler(respHandler any) Option {
 
 func WithPrometheusMetrics(collectors []prometheus.Collector) Option {
 	return func(c Connector) {
-		// TODO: metrics
+		c.(*connector).metrics = collectors
+	}
+}
+
+func WithLogger(l logger.Logger) Option {
+	return func(c Connector) {
+		c.(*connector).cfg.CDC.Logger.Logger = l
 	}
 }

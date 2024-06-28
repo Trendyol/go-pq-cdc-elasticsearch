@@ -11,6 +11,7 @@ import (
 	"github.com/Trendyol/go-pq-cdc/pq/replication"
 	es "github.com/elastic/go-elasticsearch/v7"
 	"github.com/go-playground/errors"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 type Connector interface {
@@ -25,6 +26,7 @@ type connector struct {
 	cdc             cdc.Connector
 	esClient        *es.Client
 	bulk            *elasticsearch.Bulk
+	metrics         []prometheus.Collector
 }
 
 func NewConnector(ctx context.Context, cfg config.Config, handler Handler, options ...Option) (Connector, error) {
@@ -55,6 +57,7 @@ func NewConnector(ctx context.Context, cfg config.Config, handler Handler, optio
 		return nil, errors.Wrap(err, "elasticsearch new bulk")
 	}
 	pqCDC.SetMetricCollectors(esConnector.bulk.GetMetric().PrometheusCollectors()...)
+	pqCDC.SetMetricCollectors(esConnector.metrics...)
 
 	return esConnector, nil
 }
