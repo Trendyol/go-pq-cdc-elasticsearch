@@ -22,7 +22,7 @@ import (
 )
 
 type Bulk struct {
-	metric                 *Metric
+	metric                 Metric
 	collectionIndexMapping map[string]string
 	config                 *config.Config
 	batchKeys              map[string]int
@@ -41,11 +41,6 @@ type Bulk struct {
 	batchByteSize          int
 	concurrentRequest      int
 	flushLock              sync.Mutex
-}
-
-type Metric struct {
-	ProcessLatencyMs            int64
-	BulkRequestProcessLatencyMs int64
 }
 
 type BatchItem struct {
@@ -75,7 +70,7 @@ func NewBulk(
 		batchByteSizeLimit:     int(batchByteSizeLimit),
 		isClosed:               make(chan bool, 1),
 		esClient:               esClient,
-		metric:                 &Metric{},
+		metric:                 NewMetric(),
 		collectionIndexMapping: config.Elasticsearch.CollectionIndexMapping,
 		config:                 config,
 		typeName:               []byte(config.Elasticsearch.TypeName),
@@ -138,7 +133,7 @@ func (b *Bulk) AddActions(
 	b.flushLock.Unlock()
 
 	if isLastChunk {
-		b.metric.ProcessLatencyMs = time.Since(eventTime).Milliseconds()
+		b.metric.SetProcessLatency(time.Since(eventTime).Milliseconds())
 	}
 	if b.batchSize >= b.batchSizeLimit || b.batchByteSize >= b.batchByteSizeLimit {
 		b.flushMessages()
@@ -246,12 +241,12 @@ func (b *Bulk) bulkRequest() error {
 
 	err := eg.Wait()
 
-	b.metric.BulkRequestProcessLatencyMs = time.Since(startedTime).Milliseconds()
+	b.metric.SetBulkRequestProcessLatency(time.Since(startedTime).Milliseconds())
 
 	return err
 }
 
-func (b *Bulk) GetMetric() *Metric {
+func (b *Bulk) GetMetric() Metric {
 	return b.metric
 }
 
