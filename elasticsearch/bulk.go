@@ -92,12 +92,12 @@ func (b *Bulk) AddActions(
 	ctx *replication.ListenerContext,
 	eventTime time.Time,
 	actions []Action,
-	collectionName string,
+	tableNamespace, tableName string,
 	isLastChunk bool,
 ) {
 	b.flushLock.Lock()
 	for i, action := range actions {
-		indexName := b.getIndexName(collectionName, action.IndexName)
+		indexName := b.getIndexName(tableNamespace, tableName, action.IndexName)
 		actions[i].IndexName = indexName
 		value := getEsActionJSON(
 			action.ID,
@@ -309,14 +309,14 @@ func joinErrors(body map[string]any) (map[string]string, error) {
 	return ivd, fmt.Errorf(sb.String())
 }
 
-func (b *Bulk) getIndexName(collectionName, actionIndexName string) string {
+func (b *Bulk) getIndexName(tableNamespace, tableName, actionIndexName string) string {
 	if actionIndexName != "" {
 		return actionIndexName
 	}
 
-	indexName := b.collectionIndexMapping[collectionName]
+	indexName := b.collectionIndexMapping[fmt.Sprintf("%s.%s", tableNamespace, tableName)]
 	if indexName == "" {
-		panic(fmt.Sprintf("there is no index mapping for collection: %s on your configuration", collectionName))
+		panic(fmt.Sprintf("there is no index mapping for collection: %s.%s on your configuration", tableNamespace, tableName))
 	}
 
 	return indexName
