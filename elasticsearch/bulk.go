@@ -185,8 +185,8 @@ func getEsActionJSON(docID []byte, action ActionType, indexName string, routing 
 
 func (b *Bulk) Close() {
 	b.batchTicker.Stop()
-
 	b.flushMessages()
+	close(b.actionCh)
 }
 
 func (b *Bulk) flushMessages() {

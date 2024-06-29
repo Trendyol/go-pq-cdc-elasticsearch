@@ -62,9 +62,20 @@ func NewConnector(ctx context.Context, cfg config.Config, handler Handler, optio
 	return esConnector, nil
 }
 
-func (c *connector) Start(ctx context.Context) {}
+func (c *connector) Start(ctx context.Context) {
+	go func() {
+		if err := c.cdc.WaitUntilReady(ctx); err != nil {
+			panic(err)
+		}
+		c.bulk.StartBulk()
+	}()
+	c.cdc.Start(ctx)
+}
 
-func (c *connector) Close() {}
+func (c *connector) Close() {
+	c.cdc.Close()
+	c.bulk.Close()
+}
 
 func (c *connector) listener(ctx *replication.ListenerContext) {
 	var msg Message
