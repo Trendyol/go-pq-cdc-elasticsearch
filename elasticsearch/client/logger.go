@@ -1,9 +1,10 @@
 package client
 
 import (
-	"github.com/Trendyol/go-pq-cdc/logger"
 	"net/http"
 	"time"
+
+	"github.com/Trendyol/go-pq-cdc/logger"
 )
 
 type LoggerAdapter struct{}

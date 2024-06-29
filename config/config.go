@@ -1,8 +1,9 @@
 package config
 
 import (
-	"github.com/Trendyol/go-pq-cdc/config"
 	"time"
+
+	"github.com/Trendyol/go-pq-cdc/config"
 )
 
 type Elasticsearch struct {

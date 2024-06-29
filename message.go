@@ -1,9 +1,10 @@
 package cdc
 
 import (
+	"time"
+
 	"github.com/Trendyol/go-pq-cdc/pq/message/format"
 	"github.com/elastic/go-elasticsearch/v7"
-	"time"
 )
 
 type Message struct {

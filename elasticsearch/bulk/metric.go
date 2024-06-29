@@ -1,8 +1,9 @@
 package bulk
 
 import (
-	"github.com/prometheus/client_golang/prometheus"
 	"os"
+
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 const namespace = "go_pq_cdc_elasticsearch"

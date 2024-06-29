@@ -2,6 +2,8 @@ package cdc
 
 import (
 	"context"
+	"log/slog"
+
 	cdc "github.com/Trendyol/go-pq-cdc"
 	"github.com/Trendyol/go-pq-cdc-elasticsearch/config"
 	"github.com/Trendyol/go-pq-cdc-elasticsearch/elasticsearch"
@@ -14,7 +16,6 @@ import (
 	es "github.com/elastic/go-elasticsearch/v7"
 	"github.com/go-playground/errors"
 	"github.com/prometheus/client_golang/prometheus"
-	"log/slog"
 )
 
 type Connector interface {

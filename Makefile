@@ -13,7 +13,7 @@ init/vulnCheck:
 	go install golang.org/x/vuln/cmd/govulncheck@latest
 
 .PHONY: audit
-audit: vendor
+audit:
 	@echo 'Formatting code...'
 	fieldalignment -fix ./...
 	golangci-lint run -c .golangci.yml --timeout=5m -v --fix

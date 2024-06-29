@@ -4,6 +4,10 @@ import (
 	gobytes "bytes"
 	"context"
 	"fmt"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/Trendyol/go-pq-cdc-elasticsearch/config"
 	elasticsearch2 "github.com/Trendyol/go-pq-cdc-elasticsearch/elasticsearch"
 	"github.com/Trendyol/go-pq-cdc-elasticsearch/internal/bytes"
@@ -11,20 +15,18 @@ import (
 	"github.com/Trendyol/go-pq-cdc/logger"
 	"github.com/Trendyol/go-pq-cdc/pq/replication"
 	"github.com/go-playground/errors"
-	"strings"
-	"sync"
-	"time"
 
 	"golang.org/x/sync/errgroup"
 
 	"github.com/elastic/go-elasticsearch/v7/esapi"
 
 	"github.com/elastic/go-elasticsearch/v7"
-	"github.com/json-iterator/go"
+	jsoniter "github.com/json-iterator/go"
 )
 
 type Bulk struct {
 	metric                 Metric
+	responseHandler        elasticsearch2.ResponseHandler
 	collectionIndexMapping map[string]string
 	config                 *config.Config
 	batchKeys              map[string]int
@@ -32,9 +34,9 @@ type Bulk struct {
 	isClosed               chan bool
 	actionCh               chan elasticsearch2.Action
 	esClient               *elasticsearch.Client
-	readers                []*bytes.MultiDimensionReader
-	typeName               []byte
 	batch                  []BatchItem
+	typeName               []byte
+	readers                []*bytes.MultiDimensionReader
 	batchIndex             int
 	batchSize              int
 	batchSizeLimit         int
@@ -43,7 +45,6 @@ type Bulk struct {
 	batchByteSize          int
 	concurrentRequest      int
 	flushLock              sync.Mutex
-	responseHandler        elasticsearch2.ResponseHandler
 }
 
 type BatchItem struct {

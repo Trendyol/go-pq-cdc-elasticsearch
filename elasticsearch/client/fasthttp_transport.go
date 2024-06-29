@@ -1,10 +1,11 @@
 package client
 
 import (
-	"github.com/Trendyol/go-pq-cdc-elasticsearch/config"
 	"io"
 	"net/http"
 	"strings"
+
+	"github.com/Trendyol/go-pq-cdc-elasticsearch/config"
 
 	"github.com/valyala/fasthttp"
 )
