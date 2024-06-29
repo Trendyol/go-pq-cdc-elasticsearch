@@ -2,6 +2,7 @@ package cdc
 
 import (
 	"context"
+
 	cdc "github.com/Trendyol/go-pq-cdc"
 	"github.com/Trendyol/go-pq-cdc-elasticsearch/config"
 	"github.com/Trendyol/go-pq-cdc-elasticsearch/elasticsearch"
