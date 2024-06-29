@@ -7,7 +7,7 @@ replace github.com/Trendyol/go-pq-cdc-elasticsearch => ../..
 require github.com/Trendyol/go-pq-cdc-elasticsearch v0.0.0-00010101000000-000000000000
 
 require (
-	github.com/Trendyol/go-pq-cdc v0.0.0-20240628190924-198501dc34c9 // indirect
+	github.com/Trendyol/go-pq-cdc v0.0.0-20240629091219-5e7aee5c9d82 // indirect
 	github.com/andybalholm/brotli v1.1.0 // indirect
 	github.com/avast/retry-go/v4 v4.6.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
