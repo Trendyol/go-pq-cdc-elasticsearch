@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/Trendyol/go-pq-cdc/pq/message/format"
-	"github.com/elastic/go-elasticsearch/v7"
+	"github.com/elastic/go-elasticsearch/v8"
 )
 
 type Message struct {

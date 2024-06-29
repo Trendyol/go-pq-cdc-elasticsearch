@@ -62,7 +62,7 @@ func main() {
 		},
 		Elasticsearch: config.Elasticsearch{
 			BatchSizeLimit: 10000,
-			CollectionIndexMapping: map[string]string{
+			TableIndexMapping: map[string]string{
 				"public.users": "users",
 			},
 			TypeName: "_doc",

@@ -2,7 +2,7 @@ package client
 
 import (
 	"github.com/Trendyol/go-pq-cdc-elasticsearch/config"
-	"github.com/elastic/go-elasticsearch/v7"
+	"github.com/elastic/go-elasticsearch/v8"
 )
 
 func NewClient(config *config.Config) (*elasticsearch.Client, error) {

@@ -8,7 +8,7 @@ import (
 
 type Elasticsearch struct {
 	BatchByteSizeLimit          string            `yaml:"batchByteSizeLimit"`
-	CollectionIndexMapping      map[string]string `yaml:"collectionIndexMapping"`
+	TableIndexMapping           map[string]string `yaml:"tableIndexMapping"`
 	MaxConnsPerHost             *int              `yaml:"maxConnsPerHost"`
 	MaxIdleConnDuration         *time.Duration    `yaml:"maxIdleConnDuration"`
 	DiscoverNodesInterval       *time.Duration    `yaml:"discoverNodesInterval"`

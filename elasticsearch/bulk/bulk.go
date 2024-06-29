@@ -18,9 +18,9 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	"github.com/elastic/go-elasticsearch/v7/esapi"
+	"github.com/elastic/go-elasticsearch/v8/esapi"
 
-	"github.com/elastic/go-elasticsearch/v7"
+	"github.com/elastic/go-elasticsearch/v8"
 	jsoniter "github.com/json-iterator/go"
 )
 
@@ -38,26 +38,26 @@ type Indexer interface {
 }
 
 type Bulk struct {
-	metric                 Metric
-	responseHandler        elasticsearch2.ResponseHandler
-	collectionIndexMapping map[string]string
-	config                 *config.Config
-	batchKeys              map[string]int
-	batchTicker            *time.Ticker
-	isClosed               chan bool
-	actionCh               chan elasticsearch2.Action
-	esClient               *elasticsearch.Client
-	batch                  []BatchItem
-	typeName               []byte
-	readers                []*bytes.MultiDimensionReader
-	batchIndex             int
-	batchSize              int
-	batchSizeLimit         int
-	batchTickerDuration    time.Duration
-	batchByteSizeLimit     int
-	batchByteSize          int
-	concurrentRequest      int
-	flushLock              sync.Mutex
+	metric              Metric
+	responseHandler     elasticsearch2.ResponseHandler
+	indexMapping        map[string]string
+	config              *config.Config
+	batchKeys           map[string]int
+	batchTicker         *time.Ticker
+	isClosed            chan bool
+	actionCh            chan elasticsearch2.Action
+	esClient            *elasticsearch.Client
+	batch               []BatchItem
+	typeName            []byte
+	readers             []*bytes.MultiDimensionReader
+	batchIndex          int
+	batchSize           int
+	batchSizeLimit      int
+	batchTickerDuration time.Duration
+	batchByteSizeLimit  int
+	batchByteSize       int
+	concurrentRequest   int
+	flushLock           sync.Mutex
 }
 
 type BatchItem struct {
@@ -81,20 +81,20 @@ func NewBulk(
 	}
 
 	bulk := &Bulk{
-		batchTickerDuration:    config.Elasticsearch.BatchTickerDuration,
-		batchTicker:            time.NewTicker(config.Elasticsearch.BatchTickerDuration),
-		actionCh:               make(chan elasticsearch2.Action, config.Elasticsearch.BatchSizeLimit),
-		batchSizeLimit:         config.Elasticsearch.BatchSizeLimit,
-		batchByteSizeLimit:     int(batchByteSizeLimit),
-		isClosed:               make(chan bool, 1),
-		esClient:               esClient,
-		metric:                 NewMetric(config.CDC.Slot.Name),
-		collectionIndexMapping: config.Elasticsearch.CollectionIndexMapping,
-		config:                 config,
-		typeName:               []byte(config.Elasticsearch.TypeName),
-		readers:                readers,
-		concurrentRequest:      config.Elasticsearch.ConcurrentRequest,
-		batchKeys:              make(map[string]int, config.Elasticsearch.BatchSizeLimit),
+		batchTickerDuration: config.Elasticsearch.BatchTickerDuration,
+		batchTicker:         time.NewTicker(config.Elasticsearch.BatchTickerDuration),
+		actionCh:            make(chan elasticsearch2.Action, config.Elasticsearch.BatchSizeLimit),
+		batchSizeLimit:      config.Elasticsearch.BatchSizeLimit,
+		batchByteSizeLimit:  int(batchByteSizeLimit),
+		isClosed:            make(chan bool, 1),
+		esClient:            esClient,
+		metric:              NewMetric(config.CDC.Slot.Name),
+		indexMapping:        config.Elasticsearch.TableIndexMapping,
+		config:              config,
+		typeName:            []byte(config.Elasticsearch.TypeName),
+		readers:             readers,
+		concurrentRequest:   config.Elasticsearch.ConcurrentRequest,
+		batchKeys:           make(map[string]int, config.Elasticsearch.BatchSizeLimit),
 	}
 
 	Options(options).Apply(bulk)
@@ -338,9 +338,9 @@ func (b *Bulk) getIndexName(tableNamespace, tableName, actionIndexName string) s
 		return actionIndexName
 	}
 
-	indexName := b.collectionIndexMapping[fmt.Sprintf("%s.%s", tableNamespace, tableName)]
+	indexName := b.indexMapping[fmt.Sprintf("%s.%s", tableNamespace, tableName)]
 	if indexName == "" {
-		panic(fmt.Sprintf("there is no index mapping for collection: %s.%s on your configuration", tableNamespace, tableName))
+		panic(fmt.Sprintf("there is no index mapping for table: %s.%s on your configuration", tableNamespace, tableName))
 	}
 
 	return indexName
