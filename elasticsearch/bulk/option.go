@@ -1,4 +1,8 @@
-package elasticsearch
+package bulk
+
+import (
+	"github.com/Trendyol/go-pq-cdc-elasticsearch/elasticsearch"
+)
 
 type Option func(*Bulk)
 
@@ -10,14 +14,14 @@ func (ops Options) Apply(c *Bulk) {
 	}
 }
 
-func WithResponseHandler(respHandler ResponseHandler) Option {
+func WithResponseHandler(respHandler elasticsearch.ResponseHandler) Option {
 	return func(b *Bulk) {
 		if respHandler == nil {
 			return
 		}
 
 		b.responseHandler = respHandler
-		b.responseHandler.OnInit(&ResponseHandlerInitContext{
+		b.responseHandler.OnInit(&elasticsearch.ResponseHandlerInitContext{
 			Config:              b.config,
 			ElasticsearchClient: b.esClient,
 		})

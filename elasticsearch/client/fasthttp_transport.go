@@ -1,4 +1,4 @@
-package elasticsearch
+package client
 
 import (
 	"github.com/Trendyol/go-pq-cdc-elasticsearch/config"
@@ -9,13 +9,17 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
+type Transporter interface {
+	RoundTrip(req *http.Request) (*http.Response, error)
+}
+
 // transport implements the elastictransport interface with
 // the github.com/valyala/fasthttp HTTP client.
 type transport struct {
 	client *fasthttp.Client
 }
 
-func newTransport(cfg config.Elasticsearch) *transport {
+func NewTransport(cfg config.Elasticsearch) Transporter {
 	client := &fasthttp.Client{
 		MaxConnsPerHost:     fasthttp.DefaultMaxConnsPerHost,
 		MaxIdleConnDuration: fasthttp.DefaultMaxIdleConnDuration,

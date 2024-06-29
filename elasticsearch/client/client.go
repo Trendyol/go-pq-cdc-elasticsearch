@@ -1,4 +1,4 @@
-package elasticsearch
+package client
 
 import (
 	"github.com/Trendyol/go-pq-cdc-elasticsearch/config"
@@ -9,7 +9,7 @@ func NewClient(config *config.Config) (*elasticsearch.Client, error) {
 	client, err := elasticsearch.NewClient(elasticsearch.Config{
 		MaxRetries:            5,
 		Addresses:             config.Elasticsearch.URLs,
-		Transport:             newTransport(config.Elasticsearch),
+		Transport:             NewTransport(config.Elasticsearch),
 		CompressRequestBody:   config.Elasticsearch.CompressionEnabled,
 		DiscoverNodesOnStart:  !config.Elasticsearch.DisableDiscoverNodesOnStart,
 		DiscoverNodesInterval: *config.Elasticsearch.DiscoverNodesInterval,

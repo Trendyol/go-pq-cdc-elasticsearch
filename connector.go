@@ -5,6 +5,8 @@ import (
 	cdc "github.com/Trendyol/go-pq-cdc"
 	"github.com/Trendyol/go-pq-cdc-elasticsearch/config"
 	"github.com/Trendyol/go-pq-cdc-elasticsearch/elasticsearch"
+	"github.com/Trendyol/go-pq-cdc-elasticsearch/elasticsearch/bulk"
+	"github.com/Trendyol/go-pq-cdc-elasticsearch/elasticsearch/client"
 	"github.com/Trendyol/go-pq-cdc-elasticsearch/internal/slices"
 	"github.com/Trendyol/go-pq-cdc/logger"
 	"github.com/Trendyol/go-pq-cdc/pq/message/format"
@@ -25,7 +27,7 @@ type connector struct {
 	cfg             *config.Config
 	cdc             cdc.Connector
 	esClient        *es.Client
-	bulk            *elasticsearch.Bulk
+	bulk            *bulk.Bulk
 	metrics         []prometheus.Collector
 }
 
@@ -46,16 +48,16 @@ func NewConnector(ctx context.Context, cfg config.Config, handler Handler, optio
 	esConnector.cdc = pqCDC
 	esConnector.cfg.CDC = *pqCDC.GetConfig()
 
-	esClient, err := elasticsearch.NewClient(esConnector.cfg)
+	esClient, err := client.NewClient(esConnector.cfg)
 	if err != nil {
 		return nil, errors.Wrap(err, "elasticsearch new client")
 	}
 	esConnector.esClient = esClient
 
-	esConnector.bulk, err = elasticsearch.NewBulk(
+	esConnector.bulk, err = bulk.NewBulk(
 		esConnector.cfg,
 		esClient,
-		elasticsearch.WithResponseHandler(esConnector.responseHandler))
+		bulk.WithResponseHandler(esConnector.responseHandler))
 	if err != nil {
 		return nil, errors.Wrap(err, "elasticsearch new bulk")
 	}

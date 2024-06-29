@@ -1,4 +1,4 @@
-package elasticsearch
+package bulk
 
 import (
 	"github.com/prometheus/client_golang/prometheus"

@@ -1,4 +1,4 @@
-package elasticsearch
+package client
 
 import (
 	"github.com/Trendyol/go-pq-cdc/logger"
@@ -6,8 +6,7 @@ import (
 	"time"
 )
 
-type LoggerAdapter struct {
-}
+type LoggerAdapter struct{}
 
 func (l *LoggerAdapter) LogRoundTrip(_ *http.Request, _ *http.Response, err error, _ time.Time, _ time.Duration) error {
 	if err == nil {

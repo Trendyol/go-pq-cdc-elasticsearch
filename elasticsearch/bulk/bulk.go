@@ -1,10 +1,11 @@
-package elasticsearch
+package bulk
 
 import (
 	gobytes "bytes"
 	"context"
 	"fmt"
 	"github.com/Trendyol/go-pq-cdc-elasticsearch/config"
+	elasticsearch2 "github.com/Trendyol/go-pq-cdc-elasticsearch/elasticsearch"
 	"github.com/Trendyol/go-pq-cdc-elasticsearch/internal/bytes"
 	"github.com/Trendyol/go-pq-cdc-elasticsearch/internal/slices"
 	"github.com/Trendyol/go-pq-cdc/logger"
@@ -29,7 +30,7 @@ type Bulk struct {
 	batchKeys              map[string]int
 	batchTicker            *time.Ticker
 	isClosed               chan bool
-	actionCh               chan Action
+	actionCh               chan elasticsearch2.Action
 	esClient               *elasticsearch.Client
 	readers                []*bytes.MultiDimensionReader
 	typeName               []byte
@@ -42,11 +43,11 @@ type Bulk struct {
 	batchByteSize          int
 	concurrentRequest      int
 	flushLock              sync.Mutex
-	responseHandler        ResponseHandler
+	responseHandler        elasticsearch2.ResponseHandler
 }
 
 type BatchItem struct {
-	Action *Action
+	Action *elasticsearch2.Action
 	Bytes  []byte
 }
 
@@ -68,7 +69,7 @@ func NewBulk(
 	bulk := &Bulk{
 		batchTickerDuration:    config.Elasticsearch.BatchTickerDuration,
 		batchTicker:            time.NewTicker(config.Elasticsearch.BatchTickerDuration),
-		actionCh:               make(chan Action, config.Elasticsearch.BatchSizeLimit),
+		actionCh:               make(chan elasticsearch2.Action, config.Elasticsearch.BatchSizeLimit),
 		batchSizeLimit:         config.Elasticsearch.BatchSizeLimit,
 		batchByteSizeLimit:     int(batchByteSizeLimit),
 		isClosed:               make(chan bool, 1),
@@ -96,7 +97,7 @@ func (b *Bulk) StartBulk() {
 func (b *Bulk) AddActions(
 	ctx *replication.ListenerContext,
 	eventTime time.Time,
-	actions []Action,
+	actions []elasticsearch2.Action,
 	tableNamespace, tableName string,
 	isLastChunk bool,
 ) {
@@ -162,10 +163,10 @@ var metaPool = sync.Pool{
 	},
 }
 
-func getEsActionJSON(docID []byte, action ActionType, indexName string, routing *string, source []byte, typeName []byte) []byte {
+func getEsActionJSON(docID []byte, action elasticsearch2.ActionType, indexName string, routing *string, source []byte, typeName []byte) []byte {
 	meta := metaPool.Get().([]byte)[:0]
 
-	if action == Index {
+	if action == elasticsearch2.Index {
 		meta = append(meta, indexPrefix...)
 	} else {
 		meta = append(meta, deletePrefix...)
@@ -182,7 +183,7 @@ func getEsActionJSON(docID []byte, action ActionType, indexName string, routing 
 		meta = append(meta, typeName...)
 	}
 	meta = append(meta, postFix...)
-	if action == Index {
+	if action == elasticsearch2.Index {
 		meta = append(meta, '\n')
 		meta = append(meta, source...)
 	}
@@ -331,7 +332,7 @@ func (b *Bulk) getIndexName(tableNamespace, tableName, actionIndexName string) s
 	return indexName
 }
 
-func (b *Bulk) handleResponse(batchActions []*Action, errs map[string]string) {
+func (b *Bulk) handleResponse(batchActions []*elasticsearch2.Action, errs map[string]string) {
 	if b.responseHandler == nil {
 		return
 	}
@@ -339,20 +340,20 @@ func (b *Bulk) handleResponse(batchActions []*Action, errs map[string]string) {
 	for _, a := range batchActions {
 		key := getActionKey(*a)
 		if _, ok := errs[key]; ok {
-			b.responseHandler.OnError(&ResponseHandlerContext{
+			b.responseHandler.OnError(&elasticsearch2.ResponseHandlerContext{
 				Action: a,
 				Err:    fmt.Errorf(errs[key]),
 			})
 			continue
 		}
 
-		b.responseHandler.OnSuccess(&ResponseHandlerContext{
+		b.responseHandler.OnSuccess(&elasticsearch2.ResponseHandlerContext{
 			Action: a,
 		})
 	}
 }
 
-func getActionKey(action Action) string {
+func getActionKey(action elasticsearch2.Action) string {
 	if action.Routing != nil {
 		return fmt.Sprintf("%s:%s:%s", action.ID, action.IndexName, *action.Routing)
 	}
@@ -367,8 +368,8 @@ func getBytes(batchItems []BatchItem) [][]byte {
 	return batchBytes
 }
 
-func getActions(batchItems []BatchItem) []*Action {
-	batchActions := make([]*Action, 0, len(batchItems))
+func getActions(batchItems []BatchItem) []*elasticsearch2.Action {
+	batchActions := make([]*elasticsearch2.Action, 0, len(batchItems))
 	for _, batchItem := range batchItems {
 		batchActions = append(batchActions, batchItem.Action)
 	}
