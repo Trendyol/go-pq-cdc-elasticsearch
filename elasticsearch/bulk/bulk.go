@@ -24,6 +24,19 @@ import (
 	jsoniter "github.com/json-iterator/go"
 )
 
+type Indexer interface {
+	StartBulk()
+	AddActions(
+		ctx *replication.ListenerContext,
+		eventTime time.Time,
+		actions []elasticsearch2.Action,
+		tableNamespace, tableName string,
+		isLastChunk bool,
+	)
+	GetMetric() Metric
+	Close()
+}
+
 type Bulk struct {
 	metric                 Metric
 	responseHandler        elasticsearch2.ResponseHandler

@@ -29,7 +29,7 @@ type connector struct {
 	cfg             *config.Config
 	cdc             cdc.Connector
 	esClient        *es.Client
-	bulk            *bulk.Bulk
+	bulk            bulk.Indexer
 	metrics         []prometheus.Collector
 }
 
