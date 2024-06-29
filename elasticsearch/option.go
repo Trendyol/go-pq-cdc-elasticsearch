@@ -12,6 +12,10 @@ func (ops Options) Apply(c *Bulk) {
 
 func WithResponseHandler(respHandler ResponseHandler) Option {
 	return func(b *Bulk) {
+		if respHandler == nil {
+			return
+		}
+
 		b.responseHandler = respHandler
 		b.responseHandler.OnInit(&ResponseHandlerInitContext{
 			Config:              b.config,
