@@ -3,13 +3,11 @@ package elasticsearch
 import (
 	"github.com/Trendyol/go-pq-cdc-elasticsearch/config"
 	"github.com/elastic/go-elasticsearch/v7"
-
-	"math"
 )
 
 func NewClient(config *config.Config) (*elasticsearch.Client, error) {
-	return elasticsearch.NewClient(elasticsearch.Config{
-		MaxRetries:            math.MaxInt,
+	client, err := elasticsearch.NewClient(elasticsearch.Config{
+		MaxRetries:            5,
 		Addresses:             config.Elasticsearch.URLs,
 		Transport:             newTransport(config.Elasticsearch),
 		CompressRequestBody:   config.Elasticsearch.CompressionEnabled,
@@ -17,4 +15,13 @@ func NewClient(config *config.Config) (*elasticsearch.Client, error) {
 		DiscoverNodesInterval: *config.Elasticsearch.DiscoverNodesInterval,
 		Logger:                &LoggerAdapter{},
 	})
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err = client.Ping(); err != nil {
+		return nil, err
+	}
+
+	return client, nil
 }
