@@ -1,6 +1,7 @@
 package cdc
 
 import (
+	"github.com/Trendyol/go-pq-cdc-elasticsearch/elasticsearch"
 	"github.com/Trendyol/go-pq-cdc/logger"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -15,7 +16,7 @@ func (ops Options) Apply(c Connector) {
 	}
 }
 
-func WithResponseHandler(respHandler any) Option {
+func WithResponseHandler(respHandler elasticsearch.ResponseHandler) Option {
 	return func(c Connector) {
 		c.(*connector).responseHandler = respHandler
 	}

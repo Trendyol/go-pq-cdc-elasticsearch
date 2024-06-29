@@ -21,7 +21,7 @@ type Connector interface {
 
 type connector struct {
 	handler         Handler
-	responseHandler any
+	responseHandler elasticsearch.ResponseHandler
 	cfg             *config.Config
 	cdc             cdc.Connector
 	esClient        *es.Client
@@ -52,7 +52,10 @@ func NewConnector(ctx context.Context, cfg config.Config, handler Handler, optio
 	}
 	esConnector.esClient = esClient
 
-	esConnector.bulk, err = elasticsearch.NewBulk(esConnector.cfg, esClient)
+	esConnector.bulk, err = elasticsearch.NewBulk(
+		esConnector.cfg,
+		esClient,
+		elasticsearch.WithResponseHandler(esConnector.responseHandler))
 	if err != nil {
 		return nil, errors.Wrap(err, "elasticsearch new bulk")
 	}

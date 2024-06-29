@@ -7,6 +7,7 @@ import (
 	"github.com/Trendyol/go-pq-cdc-elasticsearch/config"
 	"github.com/Trendyol/go-pq-cdc-elasticsearch/internal/bytes"
 	"github.com/Trendyol/go-pq-cdc-elasticsearch/internal/slices"
+	"github.com/Trendyol/go-pq-cdc/logger"
 	"github.com/Trendyol/go-pq-cdc/pq/replication"
 	"github.com/go-playground/errors"
 	"strings"
@@ -41,6 +42,7 @@ type Bulk struct {
 	batchByteSize          int
 	concurrentRequest      int
 	flushLock              sync.Mutex
+	responseHandler        ResponseHandler
 }
 
 type BatchItem struct {
@@ -51,6 +53,7 @@ type BatchItem struct {
 func NewBulk(
 	config *config.Config,
 	esClient *elasticsearch.Client,
+	options ...Option,
 ) (*Bulk, error) {
 	readers := make([]*bytes.MultiDimensionReader, config.Elasticsearch.ConcurrentRequest)
 	for i := 0; i < config.Elasticsearch.ConcurrentRequest; i++ {
@@ -78,6 +81,8 @@ func NewBulk(
 		concurrentRequest:      config.Elasticsearch.ConcurrentRequest,
 		batchKeys:              make(map[string]int, config.Elasticsearch.BatchSizeLimit),
 	}
+
+	Options(options).Apply(bulk)
 
 	return bulk, nil
 }
@@ -127,7 +132,9 @@ func (b *Bulk) AddActions(
 		}
 	}
 	if isLastChunk {
-		ctx.Ack()
+		if err := ctx.Ack(); err != nil {
+			logger.Error("ack", "error", err)
+		}
 	}
 
 	b.flushLock.Unlock()
@@ -187,6 +194,7 @@ func (b *Bulk) Close() {
 	b.batchTicker.Stop()
 	b.flushMessages()
 	close(b.actionCh)
+	close(b.isClosed)
 }
 
 func (b *Bulk) flushMessages() {
@@ -194,7 +202,7 @@ func (b *Bulk) flushMessages() {
 	defer b.flushLock.Unlock()
 	if len(b.batch) > 0 {
 		err := b.bulkRequest()
-		if err != nil {
+		if err != nil && b.responseHandler == nil {
 			panic(err)
 		}
 		b.batchTicker.Reset(b.batchTickerDuration)
@@ -218,7 +226,8 @@ func (b *Bulk) requestFunc(concurrentRequestIndex int, batchItems []BatchItem) f
 		if err != nil {
 			return err
 		}
-		_, err = hasResponseError(r)
+		errorData, err := hasResponseError(r)
+		b.handleResponse(getActions(batchItems), errorData)
 		if err != nil {
 			return err
 		}
@@ -322,6 +331,27 @@ func (b *Bulk) getIndexName(tableNamespace, tableName, actionIndexName string) s
 	return indexName
 }
 
+func (b *Bulk) handleResponse(batchActions []*Action, errs map[string]string) {
+	if b.responseHandler == nil {
+		return
+	}
+
+	for _, a := range batchActions {
+		key := getActionKey(*a)
+		if _, ok := errs[key]; ok {
+			b.responseHandler.OnError(&ResponseHandlerContext{
+				Action: a,
+				Err:    fmt.Errorf(errs[key]),
+			})
+			continue
+		}
+
+		b.responseHandler.OnSuccess(&ResponseHandlerContext{
+			Action: a,
+		})
+	}
+}
+
 func getActionKey(action Action) string {
 	if action.Routing != nil {
 		return fmt.Sprintf("%s:%s:%s", action.ID, action.IndexName, *action.Routing)
@@ -335,4 +365,12 @@ func getBytes(batchItems []BatchItem) [][]byte {
 		batchBytes = append(batchBytes, batchItem.Bytes)
 	}
 	return batchBytes
+}
+
+func getActions(batchItems []BatchItem) []*Action {
+	batchActions := make([]*Action, 0, len(batchItems))
+	for _, batchItem := range batchItems {
+		batchActions = append(batchActions, batchItem.Action)
+	}
+	return batchActions
 }
