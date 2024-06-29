@@ -155,7 +155,7 @@ func (b *Bulk) AddActions(
 	b.flushLock.Unlock()
 
 	if isLastChunk {
-		b.metric.SetProcessLatency(time.Since(eventTime).Milliseconds())
+		b.metric.SetProcessLatency(time.Now().UTC().Sub(eventTime).Nanoseconds())
 	}
 	if b.batchSize >= b.batchSizeLimit || b.batchByteSize >= b.batchByteSizeLimit {
 		b.flushMessages()
@@ -265,7 +265,7 @@ func (b *Bulk) bulkRequest() error {
 
 	err := eg.Wait()
 
-	b.metric.SetBulkRequestProcessLatency(time.Since(startedTime).Milliseconds())
+	b.metric.SetBulkRequestProcessLatency(time.Since(startedTime).Nanoseconds())
 
 	return err
 }
