@@ -13,7 +13,6 @@ type Elasticsearch struct {
 	DiscoverNodesInterval       *time.Duration    `yaml:"discoverNodesInterval"`
 	TypeName                    string            `yaml:"typeName"`
 	URLs                        []string          `yaml:"urls"`
-	RejectionLog                RejectionLog      `yaml:"rejectionLog"`
 	BatchSizeLimit              int               `yaml:"batchSizeLimit"`
 	BatchTickerDuration         time.Duration     `yaml:"batchTickerDuration"`
 	ConcurrentRequest           int               `yaml:"concurrentRequest"`
