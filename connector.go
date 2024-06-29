@@ -14,6 +14,7 @@ import (
 	es "github.com/elastic/go-elasticsearch/v7"
 	"github.com/go-playground/errors"
 	"github.com/prometheus/client_golang/prometheus"
+	"log/slog"
 )
 
 type Connector interface {
@@ -69,9 +70,11 @@ func NewConnector(ctx context.Context, cfg config.Config, handler Handler, optio
 
 func (c *connector) Start(ctx context.Context) {
 	go func() {
+		slog.Info("waiting for connector start...")
 		if err := c.cdc.WaitUntilReady(ctx); err != nil {
 			panic(err)
 		}
+		slog.Info("bulk process started")
 		c.bulk.StartBulk()
 	}()
 	c.cdc.Start(ctx)
