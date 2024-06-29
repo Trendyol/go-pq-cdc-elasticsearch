@@ -2,8 +2,6 @@ package cdc
 
 import (
 	"context"
-	"log/slog"
-
 	cdc "github.com/Trendyol/go-pq-cdc"
 	"github.com/Trendyol/go-pq-cdc-elasticsearch/config"
 	"github.com/Trendyol/go-pq-cdc-elasticsearch/elasticsearch"
@@ -71,11 +69,11 @@ func NewConnector(ctx context.Context, cfg config.Config, handler Handler, optio
 
 func (c *connector) Start(ctx context.Context) {
 	go func() {
-		slog.Info("waiting for connector start...")
+		logger.Info("waiting for connector start...")
 		if err := c.cdc.WaitUntilReady(ctx); err != nil {
 			panic(err)
 		}
-		slog.Info("bulk process started")
+		logger.Info("bulk process started")
 		c.bulk.StartBulk()
 	}()
 	c.cdc.Start(ctx)
