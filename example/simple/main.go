@@ -61,6 +61,7 @@ func main() {
 			},
 		},
 		Elasticsearch: config.Elasticsearch{
+			BatchSizeLimit: 10000,
 			CollectionIndexMapping: map[string]string{
 				"public.users": "users",
 			},
