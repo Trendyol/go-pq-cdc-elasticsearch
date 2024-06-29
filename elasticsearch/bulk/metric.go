@@ -18,7 +18,7 @@ type metric struct {
 	bulkRequestProcessLatencyMs prometheus.Gauge
 }
 
-func NewMetric() Metric {
+func NewMetric(slotName string) Metric {
 	hostname, _ := os.Hostname()
 	return &metric{
 		processLatencyMs: prometheus.NewGauge(prometheus.GaugeOpts{
@@ -27,7 +27,8 @@ func NewMetric() Metric {
 			Name:      "current",
 			Help:      "latest elasticsearch connector process latency in nanoseconds",
 			ConstLabels: prometheus.Labels{
-				"host": hostname,
+				"host":      hostname,
+				"slot_name": slotName,
 			},
 		}),
 		bulkRequestProcessLatencyMs: prometheus.NewGauge(prometheus.GaugeOpts{
@@ -36,7 +37,8 @@ func NewMetric() Metric {
 			Name:      "current",
 			Help:      "latest elasticsearch connector bulk request process latency in nanoseconds",
 			ConstLabels: prometheus.Labels{
-				"host": hostname,
+				"host":      hostname,
+				"slot_name": slotName,
 			},
 		}),
 	}

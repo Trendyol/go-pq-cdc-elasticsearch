@@ -74,7 +74,7 @@ func NewBulk(
 		batchByteSizeLimit:     int(batchByteSizeLimit),
 		isClosed:               make(chan bool, 1),
 		esClient:               esClient,
-		metric:                 NewMetric(),
+		metric:                 NewMetric(config.CDC.Slot.Name),
 		collectionIndexMapping: config.Elasticsearch.CollectionIndexMapping,
 		config:                 config,
 		typeName:               []byte(config.Elasticsearch.TypeName),
