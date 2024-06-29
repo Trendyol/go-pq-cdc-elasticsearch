@@ -15,9 +15,7 @@ type Message struct {
 	OldData map[string]any
 	NewData map[string]any
 
-	IsInsert bool
-	IsUpdate bool
-	IsDelete bool
+	Type MessageType
 }
 
 func NewInsertMessage(esClient *elasticsearch.Client, m *format.Insert) Message {
@@ -28,9 +26,7 @@ func NewInsertMessage(esClient *elasticsearch.Client, m *format.Insert) Message 
 		TableNamespace:      m.TableNamespace,
 		OldData:             nil,
 		NewData:             m.Decoded,
-		IsInsert:            true,
-		IsUpdate:            false,
-		IsDelete:            false,
+		Type:                InsertMessage,
 	}
 }
 
@@ -42,9 +38,7 @@ func NewUpdateMessage(esClient *elasticsearch.Client, m *format.Update) Message 
 		TableNamespace:      m.TableNamespace,
 		OldData:             m.OldDecoded,
 		NewData:             m.NewDecoded,
-		IsInsert:            false,
-		IsUpdate:            true,
-		IsDelete:            false,
+		Type:                UpdateMessage,
 	}
 }
 
@@ -56,8 +50,18 @@ func NewDeleteMessage(esClient *elasticsearch.Client, m *format.Delete) Message 
 		TableNamespace:      m.TableNamespace,
 		OldData:             m.OldDecoded,
 		NewData:             nil,
-		IsInsert:            false,
-		IsUpdate:            false,
-		IsDelete:            true,
+		Type:                DeleteMessage,
 	}
 }
+
+type MessageType string
+
+const (
+	InsertMessage MessageType = "INSERT"
+	UpdateMessage MessageType = "UPDATE"
+	DeleteMessage MessageType = "DELETE"
+)
+
+func (m MessageType) IsInsert() bool { return m == InsertMessage }
+func (m MessageType) IsUpdate() bool { return m == UpdateMessage }
+func (m MessageType) IsDelete() bool { return m == DeleteMessage }
