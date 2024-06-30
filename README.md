@@ -73,6 +73,7 @@ func main() {
 		},
 		Elasticsearch: config.Elasticsearch{
 			BatchSizeLimit: 10000,
+            BatchTickerDuration: time.Millisecond * 100,
 			TableIndexMapping: map[string]string{
 				"public.users": "users",
 			},
