@@ -45,7 +45,6 @@ type Bulk struct {
 	batchKeys           map[string]int
 	batchTicker         *time.Ticker
 	isClosed            chan bool
-	actionCh            chan elasticsearch2.Action
 	esClient            *elasticsearch.Client
 	batch               []BatchItem
 	typeName            []byte
@@ -83,7 +82,6 @@ func NewBulk(
 	bulk := &Bulk{
 		batchTickerDuration: config.Elasticsearch.BatchTickerDuration,
 		batchTicker:         time.NewTicker(config.Elasticsearch.BatchTickerDuration),
-		actionCh:            make(chan elasticsearch2.Action, config.Elasticsearch.BatchSizeLimit),
 		batchSizeLimit:      config.Elasticsearch.BatchSizeLimit,
 		batchByteSizeLimit:  int(batchByteSizeLimit),
 		isClosed:            make(chan bool, 1),
@@ -208,7 +206,6 @@ func getEsActionJSON(docID []byte, action elasticsearch2.ActionType, indexName s
 func (b *Bulk) Close() {
 	b.batchTicker.Stop()
 	b.flushMessages()
-	close(b.actionCh)
 	close(b.isClosed)
 }
 
