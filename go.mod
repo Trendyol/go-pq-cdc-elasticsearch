@@ -1,6 +1,6 @@
 module github.com/Trendyol/go-pq-cdc-elasticsearch
 
-go 1.22.4
+go 1.22.5
 
 require (
 	github.com/Trendyol/go-pq-cdc v0.0.1
