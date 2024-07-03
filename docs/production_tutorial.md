@@ -49,11 +49,6 @@ ALTER TABLE users REPLICA IDENTITY FULL;
 CREATE USER es_cdc_user WITH REPLICATION LOGIN PASSWORD 'secure_password';
 ```
 
-- Grant `SELECT` permission on the relevant tables to the replication user:
-```sql
-GRANT SELECT ON users TO es_cdc_user;
-```
-
 ## Configuration
 You can Check Configs detailed explanations [here](../README.md/#configuration)
 You only need to configure the following fields to use the `go-pq-cdc-elasticsearch` application:
