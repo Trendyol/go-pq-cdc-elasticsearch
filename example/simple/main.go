@@ -41,7 +41,8 @@ func main() {
 			Database:  "es_cdc_db",
 			DebugMode: false,
 			Publication: publication.Config{
-				Name: "es_cdc_publication",
+				CreateIfNotExists: true,
+				Name:              "es_cdc_publication",
 				Operations: publication.Operations{
 					publication.OperationInsert,
 					publication.OperationDelete,
@@ -54,6 +55,7 @@ func main() {
 				}},
 			},
 			Slot: slot.Config{
+				CreateIfNotExists:           true,
 				Name:                        "es_cdc_slot",
 				SlotActivityCheckerInterval: 3000,
 			},

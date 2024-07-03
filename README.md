@@ -57,6 +57,7 @@ func main() {
       DebugMode: false,
       Publication: publication.Config{
         Name: "es_cdc_publication",
+        CreateIfNotExists: true,
         Operations: publication.Operations{
           publication.OperationInsert,
           publication.OperationDelete,
@@ -70,6 +71,7 @@ func main() {
       },
       Slot: slot.Config{
         Name:                        "es_cdc_slot",
+        CreateIfNotExists:           true,
         SlotActivityCheckerInterval: 3000,
       },
       Metric: cdcconfig.MetricConfig{
@@ -152,11 +154,13 @@ This setup ensures continuous data synchronization and minimal downtime in captu
 | `cdc.metric.port`                           |        int        |    no    |  8080   | Set API port                                                                                          | Choose a port that is not in use by other applications.                                                                                                                  |
 | `cdc.logger.logLevel`                       |      string       |    no    |  info   | Set logging level                                                                                     | [`DEBUG`, `WARN`, `INFO`, `ERROR`]                                                                                                                                       |
 | `cdc.logger.logger`                         |      Logger       |    no    |  slog   | Set logger                                                                                            | Can be customized with other logging frameworks if `slog` is not used.                                                                                                   |
+| `cdc.publication.createIfNotExists`         |       bool        |    no    |    -    | Create publication if not exists. Otherwise, return `publication is not exists` error.                |                                                                                                                                                                          |
 | `cdc.publication.name`                      |      string       |   yes    |    -    | Set PostgreSQL publication name                                                                       | Should be unique within the database.                                                                                                                                    |
 | `cdc.publication.operations`                |     []string      |   yes    |    -    | Set PostgreSQL publication operations. List of operations to track; all or a subset can be specified. | **INSERT:** Track insert operations. <br> **UPDATE:** Track update operations. <br> **DELETE:** Track delete operations.                                                 |
 | `cdc.publication.tables`                    |      []Table      |   yes    |    -    | Set tables which are tracked by data change capture                                                   | Define multiple tables as needed.                                                                                                                                        |
 | `cdc.publication.tables[i].name`            |      string       |   yes    |    -    | Set the data change captured table name                                                               | Must be a valid table name in the specified database.                                                                                                                    |
 | `cdc.publication.tables[i].replicaIdentity` |      string       |   yes    |    -    | Set the data change captured table replica identity [`FULL`, `DEFAULT`]                               | **FULL:** Captures all columns of old row when a row is updated or deleted. <br> **DEFAULT:** Captures only the primary key of old row when a row is updated or deleted. |
+| `cdc.slot.createIfNotExists`                |       bool        |    no    |    -    | Create replication slot if not exists. Otherwise, return `replication slot is not exists` error.      |                                                                                                                                                                          |
 | `cdc.slot.name`                             |      string       |   yes    |    -    | Set the logical replication slot name                                                                 | Should be unique and descriptive.                                                                                                                                        |
 | `cdc.slot.slotActivityCheckerInterval`      |        int        |   yes    |  1000   | Set the slot activity check interval time in milliseconds                                             | Specify as an integer value in milliseconds (e.g., `1000` for 1 second).                                                                                                 |
 | `elasticsearch.tableIndexMapping`           | map[string]string |   yes    |    -    | Mapping of PostgreSQL table events to Elasticsearch indices                                           | Maps table names to Elasticsearch indices.                                                                                                                               |

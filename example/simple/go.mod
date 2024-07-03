@@ -5,7 +5,7 @@ go 1.22.4
 replace github.com/Trendyol/go-pq-cdc-elasticsearch => ../..
 
 require (
-	github.com/Trendyol/go-pq-cdc v0.0.0-20240629091219-5e7aee5c9d82
+	github.com/Trendyol/go-pq-cdc v0.0.1
 	github.com/Trendyol/go-pq-cdc-elasticsearch v0.0.0-20240628144743-a0f06e9b6d86
 )
 
