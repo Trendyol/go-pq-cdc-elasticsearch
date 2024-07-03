@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	cdc "github.com/Trendyol/go-pq-cdc-elasticsearch"
 	"github.com/Trendyol/go-pq-cdc-elasticsearch/config"
 	"github.com/Trendyol/go-pq-cdc-elasticsearch/elasticsearch"
@@ -85,6 +86,7 @@ func main() {
 }
 
 func Handler(msg cdc.Message) []elasticsearch.Action {
+	slog.Info("message received", "type", msg.Type, "msg", fmt.Sprintf("%#v", msg))
 	switch msg.Type {
 	case cdc.InsertMessage:
 		b, _ := json.Marshal(msg.NewData)
