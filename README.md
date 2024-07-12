@@ -198,7 +198,7 @@ All cdc related metrics are automatically injected. It means you don't need to d
 
 | go-pq-cdc Version | Minimum PostgreSQL Server Version |
 |-------------------|-----------------------------------|
-| 0.0.1 or higher   | 15                                |
+| 0.0.2 or higher   | 14                                |
 
 ### Breaking Changes
 
