@@ -95,6 +95,10 @@ func NewBulk(
 		batchKeys:           make(map[string]int, config.Elasticsearch.BatchSizeLimit),
 	}
 
+	if config.Elasticsearch.TypeName == "" {
+		bulk.typeName = nil
+	}
+
 	Options(options).Apply(bulk)
 
 	return bulk, nil
