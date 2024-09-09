@@ -12,7 +12,7 @@ import (
 	"github.com/Trendyol/go-pq-cdc/logger"
 	"github.com/Trendyol/go-pq-cdc/pq/message/format"
 	"github.com/Trendyol/go-pq-cdc/pq/replication"
-	es "github.com/elastic/go-elasticsearch/v8"
+	es "github.com/elastic/go-elasticsearch/v7"
 	"github.com/go-playground/errors"
 	"github.com/prometheus/client_golang/prometheus"
 )

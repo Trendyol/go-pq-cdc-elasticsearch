@@ -8,6 +8,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Trendyol/go-pq-cdc/pq/timescaledb"
+	"github.com/elastic/go-elasticsearch/v7"
+
 	"github.com/Trendyol/go-pq-cdc-elasticsearch/config"
 	elasticsearch2 "github.com/Trendyol/go-pq-cdc-elasticsearch/elasticsearch"
 	"github.com/Trendyol/go-pq-cdc-elasticsearch/internal/bytes"
@@ -18,9 +21,8 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	"github.com/elastic/go-elasticsearch/v8/esapi"
+	"github.com/elastic/go-elasticsearch/v7/esapi"
 
-	"github.com/elastic/go-elasticsearch/v8"
 	jsoniter "github.com/json-iterator/go"
 )
 
@@ -339,7 +341,18 @@ func (b *Bulk) getIndexName(tableNamespace, tableName, actionIndexName string) s
 		return actionIndexName
 	}
 
-	indexName := b.indexMapping[fmt.Sprintf("%s.%s", tableNamespace, tableName)]
+	fullTableName := fmt.Sprintf("%s.%s", tableNamespace, tableName)
+
+	indexName := b.indexMapping[fullTableName]
+	if indexName != "" {
+		return indexName
+	}
+
+	t, ok := timescaledb.HyperTables.Load(fullTableName)
+	if ok {
+		indexName = b.indexMapping[t.(string)]
+	}
+
 	if indexName == "" {
 		panic(fmt.Sprintf("there is no index mapping for table: %s.%s on your configuration", tableNamespace, tableName))
 	}

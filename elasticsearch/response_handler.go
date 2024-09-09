@@ -2,7 +2,7 @@ package elasticsearch
 
 import (
 	"github.com/Trendyol/go-pq-cdc-elasticsearch/config"
-	es "github.com/elastic/go-elasticsearch/v8"
+	es "github.com/elastic/go-elasticsearch/v7"
 )
 
 type ResponseHandler interface {
