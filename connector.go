@@ -2,6 +2,8 @@ package cdc
 
 import (
 	"context"
+	"fmt"
+	"github.com/Trendyol/go-pq-cdc/pq/timescaledb"
 
 	cdc "github.com/Trendyol/go-pq-cdc"
 	"github.com/Trendyol/go-pq-cdc-elasticsearch/config"
@@ -98,6 +100,10 @@ func (c *connector) listener(ctx *replication.ListenerContext) {
 		return
 	}
 
+	if !c.processMessage(msg) {
+		return
+	}
+
 	actions := c.handler(msg)
 	if len(actions) == 0 {
 		if err := ctx.Ack(); err != nil {
@@ -116,4 +122,24 @@ func (c *connector) listener(ctx *replication.ListenerContext) {
 	} else {
 		c.bulk.AddActions(ctx, msg.EventTime, actions, msg.TableNamespace, msg.TableName, true)
 	}
+}
+
+func (c *connector) processMessage(msg Message) bool {
+	if len(c.cfg.Elasticsearch.TableIndexMapping) == 0 {
+		return true
+	}
+
+	fullTableName := fmt.Sprintf("%s.%s", msg.TableNamespace, msg.TableName)
+
+	if _, exists := c.cfg.Elasticsearch.TableIndexMapping[fullTableName]; exists {
+		return true
+	}
+
+	t, ok := timescaledb.HyperTables.Load(fullTableName)
+	if !ok {
+		return false
+	}
+
+	_, exists := c.cfg.Elasticsearch.TableIndexMapping[t.(string)]
+	return exists
 }
