@@ -20,14 +20,12 @@ type Metric interface {
 var hostname, _ = os.Hostname()
 
 type metric struct {
-	slotName string
-	pqCDC    cdc.Connector
-
+	pqCDC                       cdc.Connector
 	processLatencyMs            prometheus.Gauge
 	bulkRequestProcessLatencyMs prometheus.Gauge
-
-	totalIndex  map[string]prometheus.Counter
-	totalDelete map[string]prometheus.Counter
+	totalIndex                  map[string]prometheus.Counter
+	totalDelete                 map[string]prometheus.Counter
+	slotName                    string
 }
 
 func NewMetric(pqCDC cdc.Connector, slotName string) Metric {

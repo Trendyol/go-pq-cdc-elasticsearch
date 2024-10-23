@@ -49,9 +49,9 @@ type Bulk struct {
 	batchTicker         *time.Ticker
 	isClosed            chan bool
 	esClient            *elasticsearch.Client
-	batch               []BatchItem
-	typeName            []byte
 	readers             []*bytes.MultiDimensionReader
+	typeName            []byte
+	batch               []BatchItem
 	batchIndex          int
 	batchSize           int
 	batchSizeLimit      int
@@ -60,7 +60,6 @@ type Bulk struct {
 	batchByteSize       int
 	concurrentRequest   int
 	flushLock           sync.Mutex
-	pqCDC               *cdc.Connector
 }
 
 type BatchItem struct {
