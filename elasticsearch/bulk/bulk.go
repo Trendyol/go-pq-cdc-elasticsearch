@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	cdc "github.com/Trendyol/go-pq-cdc"
 	"github.com/Trendyol/go-pq-cdc/pq/timescaledb"
 	"github.com/elastic/go-elasticsearch/v7"
 
@@ -59,6 +60,7 @@ type Bulk struct {
 	batchByteSize       int
 	concurrentRequest   int
 	flushLock           sync.Mutex
+	pqCDC               *cdc.Connector
 }
 
 type BatchItem struct {
@@ -69,6 +71,7 @@ type BatchItem struct {
 func NewBulk(
 	config *config.Config,
 	esClient *elasticsearch.Client,
+	pqCDC cdc.Connector,
 	options ...Option,
 ) (*Bulk, error) {
 	readers := make([]*bytes.MultiDimensionReader, config.Elasticsearch.ConcurrentRequest)
@@ -88,7 +91,7 @@ func NewBulk(
 		batchByteSizeLimit:  int(batchByteSizeLimit),
 		isClosed:            make(chan bool, 1),
 		esClient:            esClient,
-		metric:              NewMetric(config.CDC.Slot.Name),
+		metric:              NewMetric(pqCDC, config.CDC.Slot.Name),
 		indexMapping:        config.Elasticsearch.TableIndexMapping,
 		config:              config,
 		typeName:            []byte(config.Elasticsearch.TypeName),
@@ -131,6 +134,8 @@ func (b *Bulk) AddActions(
 			action.Source,
 			b.typeName,
 		)
+
+		b.metric.incrementOp(action.Type, indexName)
 
 		key := getActionKey(actions[i])
 		if batchIndex, ok := b.batchKeys[key]; ok {

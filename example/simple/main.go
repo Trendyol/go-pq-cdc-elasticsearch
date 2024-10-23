@@ -4,16 +4,17 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
+	"os"
+	"strconv"
+	"time"
+
 	cdc "github.com/Trendyol/go-pq-cdc-elasticsearch"
 	"github.com/Trendyol/go-pq-cdc-elasticsearch/config"
 	"github.com/Trendyol/go-pq-cdc-elasticsearch/elasticsearch"
 	cdcconfig "github.com/Trendyol/go-pq-cdc/config"
 	"github.com/Trendyol/go-pq-cdc/pq/publication"
 	"github.com/Trendyol/go-pq-cdc/pq/slot"
-	"log/slog"
-	"os"
-	"strconv"
-	"time"
 )
 
 /*
@@ -25,7 +26,18 @@ import (
 	 created_on timestamptz
 	);
 
+	CREATE TABLE books (
+	 id serial PRIMARY KEY,
+	 name text NOT NULL,
+	 created_on timestamptz
+	);
+
 	INSERT INTO users (name)
+	SELECT
+		'Oyleli' || i
+	FROM generate_series(1, 100) AS i;
+
+	INSERT INTO books (name)
 	SELECT
 		'Oyleli' || i
 	FROM generate_series(1, 100) AS i;
@@ -50,10 +62,16 @@ func main() {
 					publication.OperationTruncate,
 					publication.OperationUpdate,
 				},
-				Tables: publication.Tables{publication.Table{
-					Name:            "users",
-					ReplicaIdentity: publication.ReplicaIdentityFull,
-				}},
+				Tables: publication.Tables{
+					publication.Table{
+						Name:            "users",
+						ReplicaIdentity: publication.ReplicaIdentityFull,
+					},
+					publication.Table{
+						Name:            "books",
+						ReplicaIdentity: publication.ReplicaIdentityFull,
+					},
+				},
 			},
 			Slot: slot.Config{
 				CreateIfNotExists:           true,
@@ -69,6 +87,7 @@ func main() {
 			BatchTickerDuration: time.Millisecond * 100,
 			TableIndexMapping: map[string]string{
 				"public.users": "users",
+				"public.books": "books",
 			},
 			TypeName: "_doc",
 			URLs:     []string{"http://127.0.0.1:9200"},

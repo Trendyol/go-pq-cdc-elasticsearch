@@ -3,6 +3,7 @@ package cdc
 import (
 	"context"
 	"fmt"
+
 	"github.com/Trendyol/go-pq-cdc/pq/timescaledb"
 
 	cdc "github.com/Trendyol/go-pq-cdc"
@@ -60,7 +61,9 @@ func NewConnector(ctx context.Context, cfg config.Config, handler Handler, optio
 	esConnector.bulk, err = bulk.NewBulk(
 		esConnector.cfg,
 		esClient,
-		bulk.WithResponseHandler(esConnector.responseHandler))
+		pqCDC,
+		bulk.WithResponseHandler(esConnector.responseHandler),
+	)
 	if err != nil {
 		return nil, errors.Wrap(err, "elasticsearch new bulk")
 	}
@@ -101,6 +104,9 @@ func (c *connector) listener(ctx *replication.ListenerContext) {
 	}
 
 	if !c.processMessage(msg) {
+		if err := ctx.Ack(); err != nil {
+			logger.Error("ack", "error", err)
+		}
 		return
 	}
 
