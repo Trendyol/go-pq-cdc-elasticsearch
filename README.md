@@ -186,10 +186,12 @@ This setup ensures continuous data synchronization and minimal downtime in captu
 The client collects relevant metrics related to PostgreSQL change data capture (CDC) and makes them available at
 the `/metrics` endpoint.
 
-| Metric Name                                                  | Description                                                                                           | Labels          | Value Type |
-|--------------------------------------------------------------|-------------------------------------------------------------------------------------------------------|-----------------|------------|
-| go_pq_cdc_elasticsearch_process_latency_current              | The latest elasticsearch connector process latency in nanoseconds.                                    | slot_name, host | Gauge      |
-| go_pq_cdc_elasticsearch_bulk_request_process_latency_current | The latest elasticsearch connector bulk request process latency in nanoseconds.                       | slot_name, host | Gauge      |
+| Metric Name                                                  | Description                                                                                           | Labels                      | Value Type |
+|--------------------------------------------------------------|-------------------------------------------------------------------------------------------------------|-----------------------------|------------|
+| go_pq_cdc_elasticsearch_process_latency_current              | The latest elasticsearch connector process latency in nanoseconds.                                    | slot_name, host             | Gauge      |
+| go_pq_cdc_elasticsearch_bulk_request_process_latency_current | The latest elasticsearch connector bulk request process latency in nanoseconds.                       | slot_name, host             | Gauge      |
+| go_pq_cdc_elasticsearch_index_total                          | Total number of index operation.                                                                      | slot_name, host, index_name | Counter    |
+| go_pq_cdc_elasticsearch_delete_total                         | Total number of delete operation.                                                                     | slot_name, host, index_name | Counter    |
 
 You can also use all cdc related metrics explained [here](https://github.com/Trendyol/go-pq-cdc#exposed-metrics). 
 All cdc related metrics are automatically injected. It means you don't need to do anything.
