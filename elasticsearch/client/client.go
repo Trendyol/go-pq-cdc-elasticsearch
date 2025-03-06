@@ -7,6 +7,8 @@ import (
 
 func NewClient(config *config.Config) (*elasticsearch.Client, error) {
 	client, err := elasticsearch.NewClient(elasticsearch.Config{
+		Username:              config.Elasticsearch.Username,
+		Password:              config.Elasticsearch.Password,
 		MaxRetries:            5,
 		Addresses:             config.Elasticsearch.URLs,
 		Transport:             NewTransport(config.Elasticsearch),
