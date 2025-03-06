@@ -1,6 +1,4 @@
-[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/Trendyol/go-pq-cdc-elasticsearch/badge)](https://scorecard.dev/viewer/?uri=github.com/Trendyol/go-pq-cdc-elasticsearch)
-
-# go-pq-cdc-elasticsearch [![Go Reference](https://pkg.go.dev/badge/github.com/Trendyol/go-dcp.svg)](https://pkg.go.dev/github.com/Trendyol/go-pq-cdc-elasticsearch) [![Go Report Card](https://goreportcard.com/badge/github.com/Trendyol/go-pq-cdc-elasticsearch)](https://goreportcard.com/report/github.com/Trendyol/go-pq-cdc-elasticsearch)
+# go-pq-cdc-elasticsearch [![Go Reference](https://pkg.go.dev/badge/github.com/Trendyol/go-dcp.svg)](https://pkg.go.dev/github.com/Trendyol/go-pq-cdc-elasticsearch) [![Go Report Card](https://goreportcard.com/badge/github.com/Trendyol/go-pq-cdc-elasticsearch)](https://goreportcard.com/report/github.com/Trendyol/go-pq-cdc-elasticsearch) [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/Trendyol/go-pq-cdc-elasticsearch/badge)](https://scorecard.dev/viewer/?uri=github.com/Trendyol/go-pq-cdc-elasticsearch)
 
 Elasticsearch connector for [go-pq-cdc](https://github.com/Trendyol/go-pq-cdc).
 
