@@ -83,6 +83,8 @@ func main() {
 			},
 		},
 		Elasticsearch: config.Elasticsearch{
+			Username:            "elastic",
+			Password:            "es_cdc_es_pass",
 			BatchSizeLimit:      10000,
 			BatchTickerDuration: time.Millisecond * 100,
 			TableIndexMapping: map[string]string{

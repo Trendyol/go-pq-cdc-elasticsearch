@@ -10,6 +10,7 @@ services:
       POSTGRES_DB: "es_cdc_db"
       POSTGRES_HOST_AUTH_METHOD: trust
     network_mode: "host"
+
   es01:
     image: docker.elastic.co/elasticsearch/elasticsearch:${STACK_VERSION}
     labels:
@@ -26,7 +27,7 @@ services:
       - discovery.type=single-node
       - ELASTIC_PASSWORD=es_cdc_es_pass
       - bootstrap.memory_lock=true
-      - xpack.security.enabled=false
+      - xpack.security.enabled=true
       - xpack.security.http.ssl.enabled=false
       - xpack.security.transport.ssl.enabled=false
     ulimits:
@@ -37,11 +38,12 @@ services:
       test:
         [
           "CMD-SHELL",
-          "curl -I -o /dev/null http://localhost:9200 -w '%{http_code}' | grep -q '200'",
+          "curl -u elastic:es_cdc_es_pass -I -o /dev/null http://localhost:9200 -w '%{http_code}' | grep -q '200'",
         ]
       interval: 10s
       timeout: 10s
       retries: 120
+
   kibana:
     depends_on:
       es01:
@@ -58,8 +60,8 @@ services:
     environment:
       - SERVERNAME=kibana
       - ELASTICSEARCH_HOSTS=http://es01:9200
-      - ELASTICSEARCH_USERNAME=kibana_system
-      - ELASTICSEARCH_PASSWORD=cdc_pass
+      - ELASTICSEARCH_USERNAME=elastic
+      - ELASTICSEARCH_PASSWORD=es_cdc_es_pass
     healthcheck:
       test:
         [
@@ -74,6 +76,7 @@ volumes:
   postgres_data: null
   kibana1_data: null
   es01_data: null
+
 networks:
   cdc_net:
     driver: bridge
