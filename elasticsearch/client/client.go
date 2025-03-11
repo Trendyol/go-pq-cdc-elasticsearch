@@ -3,6 +3,7 @@ package client
 import (
 	"github.com/Trendyol/go-pq-cdc-elasticsearch/config"
 	"github.com/elastic/go-elasticsearch/v7"
+	"github.com/go-playground/errors"
 )
 
 func NewClient(config *config.Config) (*elasticsearch.Client, error) {
@@ -21,8 +22,13 @@ func NewClient(config *config.Config) (*elasticsearch.Client, error) {
 		return nil, err
 	}
 
-	if _, err = client.Ping(); err != nil {
+	r, err := client.Ping()
+	if err != nil {
 		return nil, err
+	}
+
+	if r.StatusCode == 401 {
+		return nil, errors.New("unauthorized")
 	}
 
 	return client, nil
