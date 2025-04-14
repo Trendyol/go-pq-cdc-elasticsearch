@@ -3,6 +3,7 @@ package cdc
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/Trendyol/go-pq-cdc/pq/timescaledb"
 
@@ -142,10 +143,36 @@ func (c *connector) processMessage(msg Message) bool {
 	}
 
 	t, ok := timescaledb.HyperTables.Load(fullTableName)
-	if !ok {
-		return false
+	if ok {
+		_, exists := c.cfg.Elasticsearch.TableIndexMapping[t.(string)]
+		return exists
 	}
 
-	_, exists := c.cfg.Elasticsearch.TableIndexMapping[t.(string)]
-	return exists
+	parentTableName := c.findParentTable(msg.TableNamespace, msg.TableName)
+	if parentTableName != "" {
+		logger.Info("matched partition table to parent",
+			"partition", fullTableName,
+			"parent", parentTableName)
+		return true
+	}
+
+	return false
+}
+
+func (c *connector) findParentTable(tableNamespace, tableName string) string {
+	tableParts := strings.Split(tableName, "_")
+	if len(tableParts) <= 1 {
+		return ""
+	}
+
+	for i := 1; i < len(tableParts); i++ {
+		parentNameCandidate := strings.Join(tableParts[:i], "_")
+		fullParentName := fmt.Sprintf("%s.%s", tableNamespace, parentNameCandidate)
+
+		if _, exists := c.cfg.Elasticsearch.TableIndexMapping[fullParentName]; exists {
+			return fullParentName
+		}
+	}
+
+	return ""
 }
