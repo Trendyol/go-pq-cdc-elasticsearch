@@ -3,6 +3,8 @@ package cdc
 import (
 	"context"
 	"fmt"
+	"strings"
+	"sync"
 
 	"github.com/Trendyol/go-pq-cdc/pq/timescaledb"
 
@@ -26,11 +28,12 @@ type Connector interface {
 }
 
 type connector struct {
+	partitionCache  sync.Map
 	handler         Handler
 	responseHandler elasticsearch.ResponseHandler
 	cfg             *config.Config
-	cdc             cdc.Connector
 	esClient        *es.Client
+	cdc             cdc.Connector
 	bulk            bulk.Indexer
 	metrics         []prometheus.Collector
 }
@@ -135,17 +138,68 @@ func (c *connector) processMessage(msg Message) bool {
 		return true
 	}
 
-	fullTableName := fmt.Sprintf("%s.%s", msg.TableNamespace, msg.TableName)
+	fullTableName := c.getFullTableName(msg.TableNamespace, msg.TableName)
 
 	if _, exists := c.cfg.Elasticsearch.TableIndexMapping[fullTableName]; exists {
 		return true
 	}
 
 	t, ok := timescaledb.HyperTables.Load(fullTableName)
-	if !ok {
-		return false
+	if ok {
+		_, exists := c.cfg.Elasticsearch.TableIndexMapping[t.(string)]
+		return exists
 	}
 
-	_, exists := c.cfg.Elasticsearch.TableIndexMapping[t.(string)]
-	return exists
+	parentTableName := c.getParentTableName(fullTableName, msg.TableNamespace, msg.TableName)
+	return parentTableName != ""
+}
+
+func (c *connector) getParentTableName(fullTableName, tableNamespace, tableName string) string {
+	if cachedValue, found := c.partitionCache.Load(fullTableName); found {
+		parentName, ok := cachedValue.(string)
+		if !ok {
+			logger.Error("invalid cache value type for table", "table", fullTableName)
+			return ""
+		}
+
+		if parentName != "" {
+			logger.Debug("matched partition table to parent from cache",
+				"partition", fullTableName,
+				"parent", parentName)
+		}
+		return parentName
+	}
+
+	parentTableName := c.findParentTable(tableNamespace, tableName)
+	c.partitionCache.Store(fullTableName, parentTableName)
+
+	if parentTableName != "" {
+		logger.Debug("matched partition table to parent",
+			"partition", fullTableName,
+			"parent", parentTableName)
+	}
+
+	return parentTableName
+}
+
+func (c *connector) getFullTableName(tableNamespace, tableName string) string {
+	return fmt.Sprintf("%s.%s", tableNamespace, tableName)
+}
+
+func (c *connector) findParentTable(tableNamespace, tableName string) string {
+	tableParts := strings.Split(tableName, "_")
+	if len(tableParts) <= 1 {
+		return ""
+	}
+
+	for i := 1; i < len(tableParts); i++ {
+		parentNameCandidate := strings.Join(tableParts[:i], "_")
+		fullParentName := c.getFullTableName(tableNamespace, parentNameCandidate)
+
+		if _, exists := c.cfg.Elasticsearch.TableIndexMapping[fullParentName]; exists {
+			return fullParentName
+		}
+	}
+
+	return ""
 }
