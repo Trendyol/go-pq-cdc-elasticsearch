@@ -106,7 +106,17 @@ func (c *connector) listener(ctx *replication.ListenerContext) {
 		return
 	}
 
-	if !c.processMessage(msg) {
+	fullTableName := c.getFullTableName(msg.TableNamespace, msg.TableName)
+
+	tableName, exists := c.cfg.Elasticsearch.TableIndexMapping[fullTableName]
+	if !exists {
+		parentTableName := c.getParentTableName(fullTableName, msg.TableNamespace, msg.TableName)
+		if parentTableName != "" {
+			tableName = c.cfg.Elasticsearch.TableIndexMapping[parentTableName]
+		}
+	}
+
+	if !c.isTableInMapping(tableName) {
 		if err := ctx.Ack(); err != nil {
 			logger.Error("ack", "error", err)
 		}
@@ -126,32 +136,29 @@ func (c *connector) listener(ctx *replication.ListenerContext) {
 		chunks := slices.ChunkWithSize[elasticsearch.Action](actions, batchSizeLimit)
 		lastChunkIndex := len(chunks) - 1
 		for idx, chunk := range chunks {
-			c.bulk.AddActions(ctx, msg.EventTime, chunk, msg.TableNamespace, msg.TableName, idx == lastChunkIndex)
+			c.bulk.AddActions(ctx, msg.EventTime, chunk, fullTableName, idx == lastChunkIndex)
 		}
 	} else {
-		c.bulk.AddActions(ctx, msg.EventTime, actions, msg.TableNamespace, msg.TableName, true)
+		c.bulk.AddActions(ctx, msg.EventTime, actions, tableName, true)
 	}
 }
 
-func (c *connector) processMessage(msg Message) bool {
+func (c *connector) isTableInMapping(tableName string) bool {
 	if len(c.cfg.Elasticsearch.TableIndexMapping) == 0 {
 		return true
 	}
 
-	fullTableName := c.getFullTableName(msg.TableNamespace, msg.TableName)
-
-	if _, exists := c.cfg.Elasticsearch.TableIndexMapping[fullTableName]; exists {
+	if _, exists := c.cfg.Elasticsearch.TableIndexMapping[tableName]; exists {
 		return true
 	}
 
-	t, ok := timescaledb.HyperTables.Load(fullTableName)
+	t, ok := timescaledb.HyperTables.Load(tableName)
 	if ok {
 		_, exists := c.cfg.Elasticsearch.TableIndexMapping[t.(string)]
 		return exists
 	}
 
-	parentTableName := c.getParentTableName(fullTableName, msg.TableNamespace, msg.TableName)
-	return parentTableName != ""
+	return tableName != ""
 }
 
 func (c *connector) getParentTableName(fullTableName, tableNamespace, tableName string) string {
