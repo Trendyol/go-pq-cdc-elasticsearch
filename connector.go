@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/Trendyol/go-pq-cdc/pq/timescaledb"
 
@@ -34,6 +35,7 @@ type connector struct {
 	esClient        *es.Client
 	bulk            bulk.Indexer
 	metrics         []prometheus.Collector
+	partitionCache  sync.Map
 }
 
 func NewConnector(ctx context.Context, cfg config.Config, handler Handler, options ...Option) (Connector, error) {
@@ -136,7 +138,7 @@ func (c *connector) processMessage(msg Message) bool {
 		return true
 	}
 
-	fullTableName := fmt.Sprintf("%s.%s", msg.TableNamespace, msg.TableName)
+	fullTableName := c.getFullTableName(msg.TableNamespace, msg.TableName)
 
 	if _, exists := c.cfg.Elasticsearch.TableIndexMapping[fullTableName]; exists {
 		return true
@@ -148,15 +150,40 @@ func (c *connector) processMessage(msg Message) bool {
 		return exists
 	}
 
-	parentTableName := c.findParentTable(msg.TableNamespace, msg.TableName)
-	if parentTableName != "" {
-		logger.Info("matched partition table to parent",
-			"partition", fullTableName,
-			"parent", parentTableName)
-		return true
+	parentTableName := c.getParentTableName(fullTableName, msg.TableNamespace, msg.TableName)
+	return parentTableName != ""
+}
+
+func (c *connector) getParentTableName(fullTableName, tableNamespace, tableName string) string {
+	if cachedValue, found := c.partitionCache.Load(fullTableName); found {
+		parentName, ok := cachedValue.(string)
+		if !ok {
+			logger.Error("invalid cache value type for table", "table", fullTableName)
+			return ""
+		}
+
+		if parentName != "" {
+			logger.Debug("matched partition table to parent from cache",
+				"partition", fullTableName,
+				"parent", parentName)
+		}
+		return parentName
 	}
 
-	return false
+	parentTableName := c.findParentTable(tableNamespace, tableName)
+	c.partitionCache.Store(fullTableName, parentTableName)
+
+	if parentTableName != "" {
+		logger.Debug("matched partition table to parent",
+			"partition", fullTableName,
+			"parent", parentTableName)
+	}
+
+	return parentTableName
+}
+
+func (c *connector) getFullTableName(tableNamespace, tableName string) string {
+	return fmt.Sprintf("%s.%s", tableNamespace, tableName)
 }
 
 func (c *connector) findParentTable(tableNamespace, tableName string) string {
@@ -167,7 +194,7 @@ func (c *connector) findParentTable(tableNamespace, tableName string) string {
 
 	for i := 1; i < len(tableParts); i++ {
 		parentNameCandidate := strings.Join(tableParts[:i], "_")
-		fullParentName := fmt.Sprintf("%s.%s", tableNamespace, parentNameCandidate)
+		fullParentName := c.getFullTableName(tableNamespace, parentNameCandidate)
 
 		if _, exists := c.cfg.Elasticsearch.TableIndexMapping[fullParentName]; exists {
 			return fullParentName
