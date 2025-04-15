@@ -28,14 +28,14 @@ type Connector interface {
 }
 
 type connector struct {
+	partitionCache  sync.Map
 	handler         Handler
 	responseHandler elasticsearch.ResponseHandler
 	cfg             *config.Config
-	cdc             cdc.Connector
 	esClient        *es.Client
+	cdc             cdc.Connector
 	bulk            bulk.Indexer
 	metrics         []prometheus.Collector
-	partitionCache  sync.Map
 }
 
 func NewConnector(ctx context.Context, cfg config.Config, handler Handler, options ...Option) (Connector, error) {
