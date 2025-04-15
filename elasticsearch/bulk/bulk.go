@@ -129,6 +129,7 @@ func (b *Bulk) AddActions(
 			action.Routing,
 			action.Source,
 			b.typeName,
+			b.config.Elasticsearch.Version,
 		)
 
 		b.metric.incrementOp(action.Type, indexName)
@@ -182,7 +183,21 @@ var metaPool = sync.Pool{
 	},
 }
 
-func getEsActionJSON(docID []byte, action elasticsearch2.ActionType, indexName string, routing *string, source []byte, typeName []byte) []byte {
+func isTypeSupported(version string) bool {
+	if version == "" {
+		return true
+	}
+
+	parts := strings.Split(version, ".")
+	if len(parts) == 0 {
+		return true
+	}
+
+	majorVersion := parts[0]
+	return majorVersion < "8"
+}
+
+func getEsActionJSON(docID []byte, action elasticsearch2.ActionType, indexName string, routing *string, source []byte, typeName []byte, esVersion string) []byte {
 	meta := metaPool.Get().([]byte)[:0]
 
 	if action == elasticsearch2.Index {
@@ -197,7 +212,7 @@ func getEsActionJSON(docID []byte, action elasticsearch2.ActionType, indexName s
 		meta = append(meta, routingPrefix...)
 		meta = append(meta, []byte(*routing)...)
 	}
-	if typeName != nil {
+	if typeName != nil && isTypeSupported(esVersion) {
 		meta = append(meta, typePrefix...)
 		meta = append(meta, typeName...)
 	}

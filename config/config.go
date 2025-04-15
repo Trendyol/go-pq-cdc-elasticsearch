@@ -15,6 +15,7 @@ type Elasticsearch struct {
 	MaxIdleConnDuration         *time.Duration    `yaml:"maxIdleConnDuration"`
 	DiscoverNodesInterval       *time.Duration    `yaml:"discoverNodesInterval"`
 	TypeName                    string            `yaml:"typeName"`
+	Version                     string            `yaml:"version"`
 	URLs                        []string          `yaml:"urls"`
 	BatchSizeLimit              int               `yaml:"batchSizeLimit"`
 	BatchTickerDuration         time.Duration     `yaml:"batchTickerDuration"`
@@ -53,5 +54,9 @@ func (c *Config) SetDefault() {
 	if c.Elasticsearch.DiscoverNodesInterval == nil {
 		duration := 5 * time.Minute
 		c.Elasticsearch.DiscoverNodesInterval = &duration
+	}
+
+	if c.Elasticsearch.Version == "" {
+		c.Elasticsearch.Version = "7.0.0"
 	}
 }
