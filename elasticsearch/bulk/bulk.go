@@ -32,7 +32,7 @@ type Indexer interface {
 		ctx *replication.ListenerContext,
 		eventTime time.Time,
 		actions []elasticsearch2.Action,
-		tableName string,
+		indexName string,
 		isLastChunk bool,
 	)
 	GetMetric() Metric
@@ -115,12 +115,12 @@ func (b *Bulk) AddActions(
 	ctx *replication.ListenerContext,
 	eventTime time.Time,
 	actions []elasticsearch2.Action,
-	tableName string,
+	indexName string,
 	isLastChunk bool,
 ) {
 	b.flushLock.Lock()
 	for i, action := range actions {
-		indexName := b.getIndexName(tableName, action.IndexName)
+		indexName := b.getIndexName(indexName, action.IndexName)
 		actions[i].IndexName = indexName
 		value := getEsActionJSON(
 			action.ID,
@@ -352,16 +352,16 @@ func joinErrors(body map[string]any) (map[string]string, error) {
 	return ivd, fmt.Errorf(sb.String())
 }
 
-func (b *Bulk) getIndexName(tableName, actionIndexName string) string {
+func (b *Bulk) getIndexName(indexName, actionIndexName string) string {
 	if actionIndexName != "" {
 		return actionIndexName
 	}
 
-	if tableName == "" {
-		panic(fmt.Sprintf("there is no index mapping for table: %s on your configuration", tableName))
+	if indexName == "" {
+		panic(fmt.Sprintf("there is no index mapping for table: %s on your configuration", indexName))
 	}
 
-	return tableName
+	return indexName
 }
 
 func (b *Bulk) handleResponse(batchActions []*elasticsearch2.Action, errs map[string]string) {

@@ -108,15 +108,8 @@ func (c *connector) listener(ctx *replication.ListenerContext) {
 
 	fullTableName := c.getFullTableName(msg.TableNamespace, msg.TableName)
 
-	tableName, exists := c.cfg.Elasticsearch.TableIndexMapping[fullTableName]
-	if !exists {
-		parentTableName := c.getParentTableName(fullTableName, msg.TableNamespace, msg.TableName)
-		if parentTableName != "" {
-			tableName = c.cfg.Elasticsearch.TableIndexMapping[parentTableName]
-		}
-	}
-
-	if !c.isTableInMapping(tableName) {
+	indexName := c.resolveTableToIndexName(fullTableName, msg.TableNamespace, msg.TableName)
+	if indexName == "" {
 		if err := ctx.Ack(); err != nil {
 			logger.Error("ack", "error", err)
 		}
@@ -136,29 +129,38 @@ func (c *connector) listener(ctx *replication.ListenerContext) {
 		chunks := slices.ChunkWithSize[elasticsearch.Action](actions, batchSizeLimit)
 		lastChunkIndex := len(chunks) - 1
 		for idx, chunk := range chunks {
-			c.bulk.AddActions(ctx, msg.EventTime, chunk, fullTableName, idx == lastChunkIndex)
+			c.bulk.AddActions(ctx, msg.EventTime, chunk, indexName, idx == lastChunkIndex)
 		}
 	} else {
-		c.bulk.AddActions(ctx, msg.EventTime, actions, tableName, true)
+		c.bulk.AddActions(ctx, msg.EventTime, actions, indexName, true)
 	}
 }
 
-func (c *connector) isTableInMapping(tableName string) bool {
-	if len(c.cfg.Elasticsearch.TableIndexMapping) == 0 {
-		return true
+func (c *connector) resolveTableToIndexName(fullTableName, tableNamespace, tableName string) string {
+	tableIndexMapping := c.cfg.Elasticsearch.TableIndexMapping
+	if len(tableIndexMapping) == 0 {
+		return fullTableName
 	}
 
-	if _, exists := c.cfg.Elasticsearch.TableIndexMapping[tableName]; exists {
-		return true
+	if indexName, exists := tableIndexMapping[fullTableName]; exists {
+		return indexName
 	}
 
-	t, ok := timescaledb.HyperTables.Load(tableName)
-	if ok {
-		_, exists := c.cfg.Elasticsearch.TableIndexMapping[t.(string)]
-		return exists
+	parentTableName := c.getParentTableName(fullTableName, tableNamespace, tableName)
+	if parentTableName != "" {
+		if indexName, exists := tableIndexMapping[parentTableName]; exists {
+			return indexName
+		}
 	}
 
-	return tableName != ""
+	if t, ok := timescaledb.HyperTables.Load(fullTableName); ok {
+		parentName := t.(string)
+		if indexName, exists := tableIndexMapping[parentName]; exists {
+			return indexName
+		}
+	}
+
+	return ""
 }
 
 func (c *connector) getParentTableName(fullTableName, tableNamespace, tableName string) string {
