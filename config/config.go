@@ -55,8 +55,4 @@ func (c *Config) SetDefault() {
 		duration := 5 * time.Minute
 		c.Elasticsearch.DiscoverNodesInterval = &duration
 	}
-
-	if c.Elasticsearch.Version == "" {
-		c.Elasticsearch.Version = "7.0.0"
-	}
 }

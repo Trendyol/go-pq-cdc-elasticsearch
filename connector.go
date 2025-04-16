@@ -139,23 +139,23 @@ func (c *connector) listener(ctx *replication.ListenerContext) {
 func (c *connector) resolveTableToIndexName(fullTableName, tableNamespace, tableName string) string {
 	tableIndexMapping := c.cfg.Elasticsearch.TableIndexMapping
 	if len(tableIndexMapping) == 0 {
-		return fullTableName
+		return ""
 	}
 
 	if indexName, exists := tableIndexMapping[fullTableName]; exists {
 		return indexName
 	}
 
-	parentTableName := c.getParentTableName(fullTableName, tableNamespace, tableName)
-	if parentTableName != "" {
-		if indexName, exists := tableIndexMapping[parentTableName]; exists {
+	if t, ok := timescaledb.HyperTables.Load(fullTableName); ok {
+		parentName := t.(string)
+		if indexName, exists := tableIndexMapping[parentName]; exists {
 			return indexName
 		}
 	}
 
-	if t, ok := timescaledb.HyperTables.Load(fullTableName); ok {
-		parentName := t.(string)
-		if indexName, exists := tableIndexMapping[parentName]; exists {
+	parentTableName := c.getParentTableName(fullTableName, tableNamespace, tableName)
+	if parentTableName != "" {
+		if indexName, exists := tableIndexMapping[parentTableName]; exists {
 			return indexName
 		}
 	}
