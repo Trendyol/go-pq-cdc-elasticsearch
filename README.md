@@ -216,7 +216,7 @@ The connector supports different versions of Elasticsearch through the `elastics
 | Below 8.0             | `_type` parameter is included in the index requests     |
 | 8.0 and above         | `_type` parameter is automatically omitted              |
 
-If no version is specified, the connector defaults to "6.8.0" behavior (including `_type` parameter).
+If no version is specified, the connector defaults to "7.0.0" behavior (including `_type` parameter).
 
 ### Breaking Changes
 
