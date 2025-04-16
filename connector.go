@@ -106,7 +106,10 @@ func (c *connector) listener(ctx *replication.ListenerContext) {
 		return
 	}
 
-	if !c.processMessage(msg) {
+	fullTableName := c.getFullTableName(msg.TableNamespace, msg.TableName)
+
+	indexName := c.resolveTableToIndexName(fullTableName, msg.TableNamespace, msg.TableName)
+	if indexName == "" {
 		if err := ctx.Ack(); err != nil {
 			logger.Error("ack", "error", err)
 		}
@@ -126,32 +129,38 @@ func (c *connector) listener(ctx *replication.ListenerContext) {
 		chunks := slices.ChunkWithSize[elasticsearch.Action](actions, batchSizeLimit)
 		lastChunkIndex := len(chunks) - 1
 		for idx, chunk := range chunks {
-			c.bulk.AddActions(ctx, msg.EventTime, chunk, msg.TableNamespace, msg.TableName, idx == lastChunkIndex)
+			c.bulk.AddActions(ctx, msg.EventTime, chunk, indexName, idx == lastChunkIndex)
 		}
 	} else {
-		c.bulk.AddActions(ctx, msg.EventTime, actions, msg.TableNamespace, msg.TableName, true)
+		c.bulk.AddActions(ctx, msg.EventTime, actions, indexName, true)
 	}
 }
 
-func (c *connector) processMessage(msg Message) bool {
-	if len(c.cfg.Elasticsearch.TableIndexMapping) == 0 {
-		return true
+func (c *connector) resolveTableToIndexName(fullTableName, tableNamespace, tableName string) string {
+	tableIndexMapping := c.cfg.Elasticsearch.TableIndexMapping
+	if len(tableIndexMapping) == 0 {
+		return ""
 	}
 
-	fullTableName := c.getFullTableName(msg.TableNamespace, msg.TableName)
-
-	if _, exists := c.cfg.Elasticsearch.TableIndexMapping[fullTableName]; exists {
-		return true
+	if indexName, exists := tableIndexMapping[fullTableName]; exists {
+		return indexName
 	}
 
-	t, ok := timescaledb.HyperTables.Load(fullTableName)
-	if ok {
-		_, exists := c.cfg.Elasticsearch.TableIndexMapping[t.(string)]
-		return exists
+	if t, ok := timescaledb.HyperTables.Load(fullTableName); ok {
+		parentName := t.(string)
+		if indexName, exists := tableIndexMapping[parentName]; exists {
+			return indexName
+		}
 	}
 
-	parentTableName := c.getParentTableName(fullTableName, msg.TableNamespace, msg.TableName)
-	return parentTableName != ""
+	parentTableName := c.getParentTableName(fullTableName, tableNamespace, tableName)
+	if parentTableName != "" {
+		if indexName, exists := tableIndexMapping[parentTableName]; exists {
+			return indexName
+		}
+	}
+
+	return ""
 }
 
 func (c *connector) getParentTableName(fullTableName, tableNamespace, tableName string) string {

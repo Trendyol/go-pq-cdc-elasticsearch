@@ -9,7 +9,6 @@ import (
 	"time"
 
 	cdc "github.com/Trendyol/go-pq-cdc"
-	"github.com/Trendyol/go-pq-cdc/pq/timescaledb"
 	"github.com/elastic/go-elasticsearch/v7"
 
 	"github.com/Trendyol/go-pq-cdc-elasticsearch/config"
@@ -33,7 +32,7 @@ type Indexer interface {
 		ctx *replication.ListenerContext,
 		eventTime time.Time,
 		actions []elasticsearch2.Action,
-		tableNamespace, tableName string,
+		indexName string,
 		isLastChunk bool,
 	)
 	GetMetric() Metric
@@ -43,7 +42,6 @@ type Indexer interface {
 type Bulk struct {
 	metric              Metric
 	responseHandler     elasticsearch2.ResponseHandler
-	indexMapping        map[string]string
 	config              *config.Config
 	batchKeys           map[string]int
 	batchTicker         *time.Ticker
@@ -91,7 +89,6 @@ func NewBulk(
 		isClosed:            make(chan bool, 1),
 		esClient:            esClient,
 		metric:              NewMetric(pqCDC, config.CDC.Slot.Name),
-		indexMapping:        config.Elasticsearch.TableIndexMapping,
 		config:              config,
 		typeName:            []byte(config.Elasticsearch.TypeName),
 		readers:             readers,
@@ -118,12 +115,12 @@ func (b *Bulk) AddActions(
 	ctx *replication.ListenerContext,
 	eventTime time.Time,
 	actions []elasticsearch2.Action,
-	tableNamespace, tableName string,
+	indexName string,
 	isLastChunk bool,
 ) {
 	b.flushLock.Lock()
 	for i, action := range actions {
-		indexName := b.getIndexName(tableNamespace, tableName, action.IndexName)
+		indexName := b.getIndexName(indexName, action.IndexName)
 		actions[i].IndexName = indexName
 		value := getEsActionJSON(
 			action.ID,
@@ -132,6 +129,7 @@ func (b *Bulk) AddActions(
 			action.Routing,
 			action.Source,
 			b.typeName,
+			b.config.Elasticsearch.Version,
 		)
 
 		b.metric.incrementOp(action.Type, indexName)
@@ -185,7 +183,21 @@ var metaPool = sync.Pool{
 	},
 }
 
-func getEsActionJSON(docID []byte, action elasticsearch2.ActionType, indexName string, routing *string, source []byte, typeName []byte) []byte {
+func isTypeSupported(version string) bool {
+	if version == "" {
+		return true
+	}
+
+	parts := strings.Split(version, ".")
+	if len(parts) == 0 {
+		return true
+	}
+
+	majorVersion := parts[0]
+	return majorVersion < "8"
+}
+
+func getEsActionJSON(docID []byte, action elasticsearch2.ActionType, indexName string, routing *string, source []byte, typeName []byte, esVersion string) []byte {
 	meta := metaPool.Get().([]byte)[:0]
 
 	if action == elasticsearch2.Index {
@@ -200,7 +212,7 @@ func getEsActionJSON(docID []byte, action elasticsearch2.ActionType, indexName s
 		meta = append(meta, routingPrefix...)
 		meta = append(meta, []byte(*routing)...)
 	}
-	if typeName != nil {
+	if typeName != nil && isTypeSupported(esVersion) {
 		meta = append(meta, typePrefix...)
 		meta = append(meta, typeName...)
 	}
@@ -340,25 +352,13 @@ func joinErrors(body map[string]any) (map[string]string, error) {
 	return ivd, fmt.Errorf(sb.String())
 }
 
-func (b *Bulk) getIndexName(tableNamespace, tableName, actionIndexName string) string {
+func (b *Bulk) getIndexName(indexName, actionIndexName string) string {
 	if actionIndexName != "" {
 		return actionIndexName
 	}
 
-	fullTableName := fmt.Sprintf("%s.%s", tableNamespace, tableName)
-
-	indexName := b.indexMapping[fullTableName]
-	if indexName != "" {
-		return indexName
-	}
-
-	t, ok := timescaledb.HyperTables.Load(fullTableName)
-	if ok {
-		indexName = b.indexMapping[t.(string)]
-	}
-
 	if indexName == "" {
-		panic(fmt.Sprintf("there is no index mapping for table: %s.%s on your configuration", tableNamespace, tableName))
+		panic(fmt.Sprintf("there is no index mapping for table: %s on your configuration", indexName))
 	}
 
 	return indexName

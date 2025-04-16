@@ -15,6 +15,7 @@ type Elasticsearch struct {
 	MaxIdleConnDuration         *time.Duration    `yaml:"maxIdleConnDuration"`
 	DiscoverNodesInterval       *time.Duration    `yaml:"discoverNodesInterval"`
 	TypeName                    string            `yaml:"typeName"`
+	Version                     string            `yaml:"version"`
 	URLs                        []string          `yaml:"urls"`
 	BatchSizeLimit              int               `yaml:"batchSizeLimit"`
 	BatchTickerDuration         time.Duration     `yaml:"batchTickerDuration"`

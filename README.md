@@ -176,6 +176,7 @@ This setup ensures continuous data synchronization and minimal downtime in captu
 | `elasticsearch.compressionEnabled`                                                           |       bool        |              no               |  false  | Enable compression for large messages                                                                 | Useful if message sizes are large, but may increase CPU usage.                                                                                                           |
 | `elasticsearch.disableDiscoverNodesOnStart`                                                  |       bool        |              no               |  false  | Disable node discovery on client initialization                                                       | Skips node discovery when the client starts.                                                                                                                             |
 | `elasticsearch.discoverNodesInterval`                                                        |   time.Duration   |              no               |  5 min  | Periodic node discovery interval                                                                      | Specify in a human-readable format, e.g., `5m` for 5 minutes.                                                                                                            |
+| `elasticsearch.version`                                                                      |      string       |              no               |    -    | Elasticsearch version to determine compatibility features                                             | Used to handle version-specific behaviors, such as `_type` parameter support (removed in ES 8.0+). If not specified, version is automatically detected from the cluster. |
 
 ### API
 
@@ -205,6 +206,17 @@ All cdc related metrics are automatically injected. It means you don't need to d
 | go-pq-cdc Version | Minimum PostgreSQL Server Version |
 |-------------------|-----------------------------------|
 | 0.0.2 or higher   | 14                                |
+
+### Elasticsearch Version Compatibility
+
+The connector supports different versions of Elasticsearch through the `elasticsearch.version` configuration parameter:
+
+| Elasticsearch Version | Type Parameter Behavior                                 |
+|-----------------------|--------------------------------------------------------|
+| Below 8.0             | `_type` parameter is included in the index requests     |
+| 8.0 and above         | `_type` parameter is automatically omitted              |
+
+If no version is specified, the connector will automatically detect the Elasticsearch cluster version by querying the Info API after connection. This eliminates the need to manually configure the version.
 
 ### Breaking Changes
 
