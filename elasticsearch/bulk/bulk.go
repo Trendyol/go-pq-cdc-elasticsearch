@@ -171,10 +171,13 @@ func (b *Bulk) AddActions(
 var (
 	indexPrefix   = []byte(`{"index":{"_index":"`)
 	deletePrefix  = []byte(`{"delete":{"_index":"`)
+	updatePrefix  = []byte(`{"update":{"_index":"`)
+	scriptPrefix  = []byte(`{"script":`)
 	idPrefix      = []byte(`","_id":"`)
 	typePrefix    = []byte(`","_type":"`)
 	routingPrefix = []byte(`","routing":"`)
 	postFix       = []byte(`"}}`)
+	scriptPostfix = []byte(`,"scripted_upsert":true}`)
 )
 
 var metaPool = sync.Pool{
@@ -200,11 +203,15 @@ func isTypeSupported(version string) bool {
 func getEsActionJSON(docID []byte, action elasticsearch2.ActionType, indexName string, routing *string, source []byte, typeName []byte, esVersion string) []byte {
 	meta := metaPool.Get().([]byte)[:0]
 
-	if action == elasticsearch2.Index {
+	switch action {
+	case elasticsearch2.Index:
 		meta = append(meta, indexPrefix...)
-	} else {
+	case elasticsearch2.Delete:
 		meta = append(meta, deletePrefix...)
+	case elasticsearch2.ScriptUpdate:
+		meta = append(meta, updatePrefix...)
 	}
+
 	meta = append(meta, []byte(indexName)...)
 	meta = append(meta, idPrefix...)
 	meta = append(meta, bytes.EscapePredefinedBytes(docID)...)
@@ -217,9 +224,16 @@ func getEsActionJSON(docID []byte, action elasticsearch2.ActionType, indexName s
 		meta = append(meta, typeName...)
 	}
 	meta = append(meta, postFix...)
-	if action == elasticsearch2.Index {
+
+	switch action {
+	case elasticsearch2.Index:
 		meta = append(meta, '\n')
 		meta = append(meta, source...)
+	case elasticsearch2.ScriptUpdate:
+		meta = append(meta, '\n')
+		meta = append(meta, scriptPrefix...)
+		meta = append(meta, source...)
+		meta = append(meta, scriptPostfix...)
 	}
 	meta = append(meta, '\n')
 	return meta
