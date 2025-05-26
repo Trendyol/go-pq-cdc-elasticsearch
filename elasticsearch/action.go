@@ -12,15 +12,15 @@ const (
 
 type Action struct {
 	Routing   *string
-	Type      ActionType
 	IndexName string
+	Type      ActionType
 	Source    []byte
 	ID        []byte
 }
 
 type Script struct {
-	Source string                 `json:"source"`
 	Params map[string]interface{} `json:"params,omitempty"`
+	Source string                 `json:"source"`
 }
 
 func NewDeleteAction(key []byte, routing *string) Action {
