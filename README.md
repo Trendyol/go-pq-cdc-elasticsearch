@@ -8,7 +8,7 @@ go-pq-cdc-elasticsearch streams documents from PostgreSql and writes to Elastics
 
 - [go-pq-cdc-elasticsearch   ](#go-pq-cdc-elasticsearch---)
 		- [Contents](#contents)
-	- [📸 Snapshot Feature](#-snapshot-feature)
+    	- [Snapshot Feature](#-snapshot-feature)
 		- [Snapshot Modes](#snapshot-modes)
 		- [How It Works](#how-it-works)
 		- [Identifying Snapshot vs CDC Messages](#identifying-snapshot-vs-cdc-messages)
