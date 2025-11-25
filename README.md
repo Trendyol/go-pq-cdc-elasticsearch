@@ -6,22 +6,17 @@ go-pq-cdc-elasticsearch streams documents from PostgreSql and writes to Elastics
 
 ### Contents
 
-- [go-pq-cdc-elasticsearch   ](#go-pq-cdc-elasticsearch---)
-		- [Contents](#contents)
-    	- [Snapshot Feature](#-snapshot-feature)
-		- [Snapshot Modes](#snapshot-modes)
-		- [How It Works](#how-it-works)
-		- [Identifying Snapshot vs CDC Messages](#identifying-snapshot-vs-cdc-messages)
-		- [Usage](#usage)
-		- [Examples](#examples)
-		- [Availability](#availability)
-		- [Configuration](#configuration)
-		- [API](#api)
-		- [Exposed Metrics](#exposed-metrics)
-		- [Snapshot Metrics](#snapshot-metrics)
-		- [Compatibility](#compatibility)
-		- [Elasticsearch Version Compatibility](#elasticsearch-version-compatibility)
-		- [Breaking Changes](#breaking-changes)
+| Section | Description |
+|---------|-------------|
+| [Snapshot Feature](#-snapshot-feature) | Initial data synchronization before CDC |
+| [Usage](#usage) | How to use the connector |
+| [Examples](#examples) | Code examples |
+| [Availability](#availability) | High availability setup |
+| [Configuration](#configuration) | All configuration options |
+| [API](#api) | REST API endpoints |
+| [Exposed Metrics](#exposed-metrics) | Prometheus metrics |
+| [Compatibility](#compatibility) | Version compatibility |
+| [Breaking Changes](#breaking-changes) | Breaking changes log |
 
 ## 📸 Snapshot Feature
 
