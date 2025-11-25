@@ -30,8 +30,8 @@ type RejectionLog struct {
 }
 
 type Config struct {
-	CDC           config.Config
 	Elasticsearch Elasticsearch
+	CDC           config.Config
 }
 
 func (c *Config) SetDefault() {

@@ -6,14 +6,75 @@ go-pq-cdc-elasticsearch streams documents from PostgreSql and writes to Elastics
 
 ### Contents
 
-* [Usage](#usage)
-* [Examples](#examples)
-* [Availability](#availability)
-* [Configuration](#configuration)
-* [API](#api)
-* [Exposed Metrics](#exposed-metrics)
-* [Compatibility](#compatibility)
-* [Breaking Changes](#breaking-changes)
+- [go-pq-cdc-elasticsearch   ](#go-pq-cdc-elasticsearch---)
+		- [Contents](#contents)
+	- [📸 Snapshot Feature](#-snapshot-feature)
+		- [Snapshot Modes](#snapshot-modes)
+		- [How It Works](#how-it-works)
+		- [Identifying Snapshot vs CDC Messages](#identifying-snapshot-vs-cdc-messages)
+		- [Usage](#usage)
+		- [Examples](#examples)
+		- [Availability](#availability)
+		- [Configuration](#configuration)
+		- [API](#api)
+		- [Exposed Metrics](#exposed-metrics)
+		- [Snapshot Metrics](#snapshot-metrics)
+		- [Compatibility](#compatibility)
+		- [Elasticsearch Version Compatibility](#elasticsearch-version-compatibility)
+		- [Breaking Changes](#breaking-changes)
+
+## 📸 Snapshot Feature
+
+**Capture existing data before starting CDC!** The snapshot feature enables initial data synchronization, ensuring Elasticsearch receives both historical and real-time data.
+
+✨ **Key Highlights:**
+
+- **Zero Data Loss**: Consistent point-in-time snapshot using PostgreSQL's `pg_export_snapshot()`
+- **Chunk-Based Processing**: Memory-efficient processing of large tables
+- **Multi-Instance Support**: Parallel processing across multiple instances for faster snapshots
+- **Crash Recovery**: Automatic resume from failures with chunk-level tracking
+- **No Duplicates**: Seamless transition from snapshot to CDC mode
+- **Flexible Modes**: Choose between `initial`, `never`, or `snapshot_only` based on your needs
+
+### Snapshot Modes
+
+| Mode            | Description                                                                                      | Use Case                                        |
+|-----------------|--------------------------------------------------------------------------------------------------|-------------------------------------------------|
+| `initial`       | Takes snapshot only if no previous snapshot exists, then starts CDC                              | First-time setup with existing data             |
+| `never`         | Skips snapshot entirely, starts CDC immediately                                                  | New tables or when historical data not needed   |
+| `snapshot_only` | Takes snapshot and exits (no CDC, no replication slot required)                                  | One-time data migration or backfill             |
+
+### How It Works
+
+1. **Snapshot Phase**: Captures existing data in chunks for memory efficiency
+2. **Consistent Point**: Uses PostgreSQL's `pg_export_snapshot()` to ensure data consistency
+3. **CDC Phase**: Seamlessly transitions to real-time change data capture
+4. **No Gaps**: Ensures all changes during snapshot are captured via CDC
+
+### Identifying Snapshot vs CDC Messages
+
+Your handler function can distinguish between snapshot and CDC messages:
+
+```go
+func Handler(msg cdc.Message) []elasticsearch.Action {
+    // Check if this is a snapshot message (historical data)
+    if msg.Type.IsSnapshot() {
+        // Handle snapshot data - index to Elasticsearch
+        id := strconv.Itoa(int(msg.NewData["id"].(int32)))
+        data, _ := json.Marshal(msg.NewData)
+        return []elasticsearch.Action{
+            elasticsearch.NewIndexAction([]byte(id), data, nil),
+        }
+    }
+    
+    // Handle real-time CDC operations
+    if msg.Type.IsInsert() { /* ... */ }
+    if msg.Type.IsUpdate() { /* ... */ }
+    if msg.Type.IsDelete() { /* ... */ }
+}
+```
+
+For detailed configuration and usage, see the [snapshot example](./example/snapshot).
 
 ### Usage
 
@@ -125,6 +186,7 @@ func Handler(msg cdc.Message) []elasticsearch.Action {
 ### Examples
 
 * [Simple](./example/simple)
+* [Snapshot](./example/snapshot)
 
 ### Availability
 
@@ -162,6 +224,13 @@ This setup ensures continuous data synchronization and minimal downtime in captu
 | `cdc.slot.createIfNotExists`                                                                 |       bool        |              no               |    -    | Create replication slot if not exists. Otherwise, return `replication slot is not exists` error.      |                                                                                                                                                                          |
 | `cdc.slot.name`                                                                              |      string       |              yes              |    -    | Set the logical replication slot name                                                                 | Should be unique and descriptive.                                                                                                                                        |
 | `cdc.slot.slotActivityCheckerInterval`                                                       |        int        |              yes              |  1000   | Set the slot activity check interval time in milliseconds                                             | Specify as an integer value in milliseconds (e.g., `1000` for 1 second).                                                                                                 |
+| `cdc.snapshot.enabled`                                                                       |       bool        |              no               |  false  | Enable initial snapshot feature                                                                       | When enabled, captures existing data before starting CDC.                                                                                                                |
+| `cdc.snapshot.mode`                                                                          |      string       |              no               |  never  | Snapshot mode: `initial`, `never`, or `snapshot_only`                                                 | **initial:** Take snapshot only if no previous snapshot exists, then start CDC. <br> **never:** Skip snapshot, start CDC immediately. <br> **snapshot_only:** Take snapshot and exit (no CDC). |
+| `cdc.snapshot.chunkSize`                                                                     |       int64       |              no               |  8000   | Number of rows per chunk during snapshot                                                              | Adjust based on table size. Larger chunks = fewer chunks but more memory per chunk.                                                                                      |
+| `cdc.snapshot.claimTimeout`                                                                  |   time.Duration   |              no               |   30s   | Timeout to reclaim stale chunks                                                                       | If a worker doesn't send heartbeat for this duration, chunk is reclaimed by another worker.                                                                              |
+| `cdc.snapshot.heartbeatInterval`                                                             |   time.Duration   |              no               |    5s   | Interval for worker heartbeat updates                                                                 | Workers send heartbeat every N seconds to indicate they're processing a chunk.                                                                                           |
+| `cdc.snapshot.instanceId`                                                                    |      string       |              no               |  auto   | Custom instance identifier (optional)                                                                 | Auto-generated as hostname-pid if not specified. Useful for tracking workers in multi-instance scenarios.                                                                |
+| `cdc.snapshot.tables`                                                                        |      []Table      |              no*              |    -    | Tables to snapshot (required for `snapshot_only` mode, optional for `initial` mode)                   | **snapshot_only:** Must be specified here (independent from publication). <br> **initial:** If specified, must be a subset of publication tables. If not specified, all publication tables are snapshotted. |
 | `elasticsearch.username`                                                                     |      string       | no (yes, if the auth enabled) |    -    | The username for authenticating to Elasticsearch.                                                     | Maps table names to Elasticsearch indices.                                                                                                                               |
 | `elasticsearch.password`                                                                     |      string       | no (yes, if the auth enabled) |    -    | The password associated with the elasticsearch.username for authenticating to Elasticsearch.          | Maps table names to Elasticsearch indices.                                                                                                                               |
 | `elasticsearch.tableIndexMapping`                                                            | map[string]string |              yes              |    -    | Mapping of PostgreSQL table events to Elasticsearch indices                                           | Maps table names to Elasticsearch indices.                                                                                                                               |
@@ -197,6 +266,17 @@ the `/metrics` endpoint.
 | go_pq_cdc_elasticsearch_bulk_request_process_latency_current | The latest elasticsearch connector bulk request process latency in nanoseconds. | slot_name, host             | Gauge      |
 | go_pq_cdc_elasticsearch_index_total                          | Total number of index operation.                                                | slot_name, host, index_name | Counter    |
 | go_pq_cdc_elasticsearch_delete_total                         | Total number of delete operation.                                               | slot_name, host, index_name | Counter    |
+
+### Snapshot Metrics
+
+| Metric Name                                                  | Description                                                                                           | Labels                      | Value Type   |
+|--------------------------------------------------------------|-------------------------------------------------------------------------------------------------------|-----------------------------|--------------|
+| go_pq_cdc_snapshot_in_progress                               | Indicates whether snapshot is currently in progress (1 for active, 0 for inactive).                  | slot_name, host             | Gauge        |
+| go_pq_cdc_snapshot_total_tables                              | Total number of tables to snapshot.                                                                   | slot_name, host             | Gauge        |
+| go_pq_cdc_snapshot_total_chunks                              | Total number of chunks to process across all tables.                                                  | slot_name, host             | Gauge        |
+| go_pq_cdc_snapshot_completed_chunks                          | Number of chunks completed in snapshot.                                                               | slot_name, host             | Gauge        |
+| go_pq_cdc_snapshot_total_rows                                | Total number of rows read during snapshot.                                                            | slot_name, host             | Counter      |
+| go_pq_cdc_snapshot_duration_seconds                          | Duration of the last snapshot operation in seconds.                                                   | slot_name, host             | Gauge        |
 
 You can also use all cdc related metrics explained [here](https://github.com/Trendyol/go-pq-cdc#exposed-metrics).
 All cdc related metrics are automatically injected. It means you don't need to do anything.

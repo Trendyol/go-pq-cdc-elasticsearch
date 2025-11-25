@@ -24,17 +24,19 @@ import (
 
 type Connector interface {
 	Start(ctx context.Context)
+	WaitUntilReady(ctx context.Context) error
 	Close()
 }
 
 type connector struct {
-	partitionCache  sync.Map
-	handler         Handler
 	responseHandler elasticsearch.ResponseHandler
-	cfg             *config.Config
-	esClient        *es.Client
 	cdc             cdc.Connector
 	bulk            bulk.Indexer
+	handler         Handler
+	cfg             *config.Config
+	esClient        *es.Client
+	readyCh         chan struct{}
+	partitionCache  sync.Map
 	metrics         []prometheus.Collector
 }
 
@@ -44,6 +46,7 @@ func NewConnector(ctx context.Context, cfg config.Config, handler Handler, optio
 	esConnector := &connector{
 		cfg:     &cfg,
 		handler: handler,
+		readyCh: make(chan struct{}, 1),
 	}
 
 	Options(options).Apply(esConnector)
@@ -77,6 +80,22 @@ func NewConnector(ctx context.Context, cfg config.Config, handler Handler, optio
 }
 
 func (c *connector) Start(ctx context.Context) {
+	// Snapshot-only mode: different flow since upstream CDC exits immediately
+	if c.cfg.CDC.IsSnapshotOnlyMode() {
+		logger.Info("starting snapshot-only mode")
+		logger.Info("bulk process started")
+		c.bulk.StartBulk()
+
+		// Signal ready immediately since there's no CDC to wait for
+		c.readyCh <- struct{}{}
+
+		// Start CDC synchronously - it will execute snapshot and return
+		c.cdc.Start(ctx)
+		logger.Info("snapshot-only mode completed")
+		return
+	}
+
+	// Normal CDC mode: async flow
 	go func() {
 		logger.Info("waiting for connector start...")
 		if err := c.cdc.WaitUntilReady(ctx); err != nil {
@@ -84,11 +103,25 @@ func (c *connector) Start(ctx context.Context) {
 		}
 		logger.Info("bulk process started")
 		c.bulk.StartBulk()
+		c.readyCh <- struct{}{}
 	}()
 	c.cdc.Start(ctx)
 }
 
+func (c *connector) WaitUntilReady(ctx context.Context) error {
+	select {
+	case <-c.readyCh:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
 func (c *connector) Close() {
+	if !isClosed(c.readyCh) {
+		close(c.readyCh)
+	}
+
 	c.cdc.Close()
 	c.bulk.Close()
 }
@@ -102,6 +135,8 @@ func (c *connector) listener(ctx *replication.ListenerContext) {
 		msg = NewUpdateMessage(c.esClient, m)
 	case *format.Delete:
 		msg = NewDeleteMessage(c.esClient, m)
+	case *format.Snapshot:
+		msg = NewSnapshotMessage(c.esClient, m)
 	default:
 		return
 	}
@@ -211,4 +246,14 @@ func (c *connector) findParentTable(tableNamespace, tableName string) string {
 	}
 
 	return ""
+}
+
+func isClosed[T any](ch <-chan T) bool {
+	select {
+	case <-ch:
+		return true
+	default:
+	}
+
+	return false
 }

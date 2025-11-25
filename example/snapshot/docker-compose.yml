@@ -1,0 +1,65 @@
+version: "3"
+services:
+  postgres:
+    image: postgres:16.2
+    restart: always
+    command: ["-c", "wal_level=logical", "-c", "max_wal_senders=10", "-c", "max_replication_slots=10"]
+    environment:
+      POSTGRES_USER: "es_cdc_user"
+      POSTGRES_PASSWORD: "es_cdc_pass"
+      POSTGRES_DB: "es_cdc_db"
+      POSTGRES_HOST_AUTH_METHOD: trust
+    volumes:
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - cdc_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U es_cdc_user -d es_cdc_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.10
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=true
+      - ELASTIC_PASSWORD=es_cdc_es_pass
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - cdc_net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s -u elastic:es_cdc_es_pass http://localhost:9200/_cluster/health | grep -q 'green\\|yellow'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:7.17.10
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - ELASTICSEARCH_USERNAME=elastic
+      - ELASTICSEARCH_PASSWORD=es_cdc_es_pass
+    ports:
+      - "5601:5601"
+    networks:
+      - cdc_net
+    depends_on:
+      - elasticsearch
+
+volumes:
+  postgres_data: null
+  elasticsearch_data: null
+
+networks:
+  cdc_net:
+    driver: bridge
+
