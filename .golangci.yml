@@ -40,6 +40,9 @@ linters:
 
 issues:
   exclude-rules:
+    - path: example/
+      linters:
+        - funlen
     - path: (.+)_test.go
       linters:
         - funlen
