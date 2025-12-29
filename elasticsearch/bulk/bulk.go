@@ -4,6 +4,7 @@ import (
 	gobytes "bytes"
 	"context"
 	"fmt"
+	"github.com/Trendyol/go-pq-cdc/logger"
 	"strings"
 	"sync"
 	"time"
@@ -15,7 +16,6 @@ import (
 	elasticsearch2 "github.com/Trendyol/go-pq-cdc-elasticsearch/elasticsearch"
 	"github.com/Trendyol/go-pq-cdc-elasticsearch/internal/bytes"
 	"github.com/Trendyol/go-pq-cdc-elasticsearch/internal/slices"
-	"github.com/Trendyol/go-pq-cdc/logger"
 	"github.com/Trendyol/go-pq-cdc/pq/replication"
 	"github.com/go-playground/errors"
 
@@ -47,6 +47,7 @@ type Bulk struct {
 	batchTicker         *time.Ticker
 	isClosed            chan bool
 	esClient            *elasticsearch.Client
+	lastAckCtx          *replication.ListenerContext
 	readers             []*bytes.MultiDimensionReader
 	typeName            []byte
 	batch               []BatchItem
@@ -153,9 +154,7 @@ func (b *Bulk) AddActions(
 		}
 	}
 	if isLastChunk {
-		if err := ctx.Ack(); err != nil {
-			logger.Error("ack", "error", err)
-		}
+		b.lastAckCtx = ctx
 	}
 
 	b.flushLock.Unlock()
@@ -263,6 +262,12 @@ func (b *Bulk) flushMessages() {
 		b.batchIndex = 0
 		b.batchSize = 0
 		b.batchByteSize = 0
+		if b.lastAckCtx != nil {
+			if err = b.lastAckCtx.Ack(); err != nil {
+				logger.Error("ack", "error", err)
+			}
+			b.lastAckCtx = nil
+		}
 	}
 }
 
