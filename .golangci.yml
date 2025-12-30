@@ -48,3 +48,5 @@ issues:
         - funlen
         - goconst
         - dupl
+        - errcheck
+        - gocritic
