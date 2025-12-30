@@ -3,7 +3,7 @@ module github.com/Trendyol/go-pq-cdc-elasticsearch
 go 1.22.5
 
 require (
-	github.com/Trendyol/go-pq-cdc v1.2.6-0.20251229094218-18b776864109
+	github.com/Trendyol/go-pq-cdc v1.3.6
 	github.com/elastic/go-elasticsearch/v7 v7.17.10
 	github.com/go-playground/errors v3.3.0+incompatible
 	github.com/json-iterator/go v1.1.12

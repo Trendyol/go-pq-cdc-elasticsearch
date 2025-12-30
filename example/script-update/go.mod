@@ -5,7 +5,7 @@ go 1.22.5
 toolchain go1.23.4
 
 require (
-	github.com/Trendyol/go-pq-cdc v1.2.5
+	github.com/Trendyol/go-pq-cdc v1.2.6-0.20251229094218-18b776864109
 	github.com/Trendyol/go-pq-cdc-elasticsearch v0.0.0
 )
 
