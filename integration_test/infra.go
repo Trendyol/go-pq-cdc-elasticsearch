@@ -23,6 +23,7 @@ var (
 	defaultVersion    = "16.2"
 )
 
+//nolint:funlen
 func SetupInfra() (*InfraStructure, func()) {
 	ctx := context.Background()
 
