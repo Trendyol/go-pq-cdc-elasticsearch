@@ -133,7 +133,7 @@ func TestConnector_InsertOperation(t *testing.T) {
 	require.NoError(t, err)
 
 	hits := searchResult["hits"].(map[string]interface{})["hits"].([]interface{})
-	assert.Equal(t, 5, len(hits), "Should have 5 documents in Elasticsearch")
+	assert.Len(t, hits, 5, "Should have 5 documents in Elasticsearch")
 
 	// Verify document content
 	for i, hit := range hits {

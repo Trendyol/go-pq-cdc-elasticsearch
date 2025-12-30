@@ -49,3 +49,4 @@ issues:
         - goconst
         - dupl
         - errcheck
+        - gocritic
