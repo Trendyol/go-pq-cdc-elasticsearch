@@ -4,10 +4,11 @@ import (
 	gobytes "bytes"
 	"context"
 	"fmt"
-	"github.com/Trendyol/go-pq-cdc/logger"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/Trendyol/go-pq-cdc/logger"
 
 	cdc "github.com/Trendyol/go-pq-cdc"
 	"github.com/elastic/go-elasticsearch/v7"
@@ -107,9 +108,11 @@ func NewBulk(
 }
 
 func (b *Bulk) StartBulk() {
-	for range b.batchTicker.C {
-		b.flushMessages()
-	}
+	go func() {
+		for range b.batchTicker.C {
+			b.flushMessages()
+		}
+	}()
 }
 
 func (b *Bulk) AddActions(
@@ -157,12 +160,15 @@ func (b *Bulk) AddActions(
 		b.lastAckCtx = ctx
 	}
 
+	// Check if we need to flush while still holding the lock
+	shouldFlush := b.batchSize >= b.batchSizeLimit || b.batchByteSize >= b.batchByteSizeLimit
+
 	b.flushLock.Unlock()
 
 	if isLastChunk {
 		b.metric.SetProcessLatency(time.Now().UTC().Sub(eventTime).Nanoseconds())
 	}
-	if b.batchSize >= b.batchSizeLimit || b.batchByteSize >= b.batchByteSizeLimit {
+	if shouldFlush {
 		b.flushMessages()
 	}
 }
