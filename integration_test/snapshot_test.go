@@ -228,26 +228,6 @@ func TestSnapshot_SnapshotOnlyMode(t *testing.T) {
 			Password:  "cdc_pass",
 			Database:  "cdc_db",
 			DebugMode: false,
-			Publication: publication.Config{
-				CreateIfNotExists: true,
-				Name:              "cdc_publication_snapshot_only",
-				Operations: publication.Operations{
-					publication.OperationInsert,
-					publication.OperationDelete,
-					publication.OperationUpdate,
-				},
-				Tables: publication.Tables{
-					publication.Table{
-						Name:            "orders",
-						ReplicaIdentity: publication.ReplicaIdentityFull,
-					},
-				},
-			},
-			Slot: slot.Config{
-				CreateIfNotExists:           true,
-				Name:                        "cdc_slot_snapshot_only",
-				SlotActivityCheckerInterval: 3000,
-			},
 			Snapshot: cdcconfig.SnapshotConfig{
 				Enabled:   true,
 				Mode:      "snapshot_only",
