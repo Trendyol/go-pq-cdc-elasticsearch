@@ -3,7 +3,8 @@ module github.com/Trendyol/go-pq-cdc-elasticsearch
 go 1.22.5
 
 require (
-	github.com/Trendyol/go-pq-cdc v1.5.7
+	github.com/Trendyol/go-pq-cdc v1.6.8
+	github.com/docker/go-connections v0.5.0
 	github.com/elastic/go-elasticsearch/v7 v7.17.10
 	github.com/go-playground/errors v3.3.0+incompatible
 	github.com/json-iterator/go v1.1.12
@@ -31,7 +32,6 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/distribution/reference v0.6.0 // indirect
 	github.com/docker/docker v27.1.1+incompatible // indirect
-	github.com/docker/go-connections v0.5.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/go-logr/logr v1.4.1 // indirect
