@@ -374,7 +374,7 @@ func joinErrors(body map[string]any) (map[string]string, error) {
 			}
 		}
 	}
-	return ivd, fmt.Errorf(sb.String())
+	return ivd, fmt.Errorf("%s", sb.String())
 }
 
 func (b *Bulk) getIndexName(indexName, actionIndexName string) string {
@@ -399,7 +399,7 @@ func (b *Bulk) handleResponse(batchActions []*elasticsearch2.Action, errs map[st
 		if _, ok := errs[key]; ok {
 			b.responseHandler.OnError(&elasticsearch2.ResponseHandlerContext{
 				Action: a,
-				Err:    fmt.Errorf(errs[key]),
+				Err:    fmt.Errorf("%s", errs[key]),
 			})
 			continue
 		}
