@@ -20,9 +20,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const (
+	lifecycleSlotName        = "cdc_slot_lifecycle"
+	lifecyclePublicationName = "cdc_publication_lifecycle"
+	lifecycleTableName       = "users_lifecycle"
+)
+
 func TestConnector_WaitUntilReadyAfterClose(t *testing.T) {
 	ctx := context.Background()
-	connector := newLifecycleConnector(ctx, t, "cdc_slot_lifecycle_closed", "cdc_publication_lifecycle_closed", "users_lifecycle_closed")
+	connector := newLifecycleConnector(ctx, t)
 
 	go connector.Start(ctx)
 
@@ -42,7 +48,7 @@ func TestConnector_WaitUntilReadyAfterClose(t *testing.T) {
 
 func TestConnector_CloseIsIdempotent(t *testing.T) {
 	ctx := context.Background()
-	connector := newLifecycleConnector(ctx, t, "cdc_slot_lifecycle_idempotent", "cdc_publication_lifecycle_idempotent", "users_lifecycle_idempotent")
+	connector := newLifecycleConnector(ctx, t)
 
 	go connector.Start(ctx)
 
@@ -58,7 +64,7 @@ func TestConnector_CloseIsIdempotent(t *testing.T) {
 
 func TestConnector_CloseBeforeWaitUntilReadyDoesNotHang(t *testing.T) {
 	ctx := context.Background()
-	connector := newLifecycleConnector(ctx, t, "cdc_slot_lifecycle_early_close", "cdc_publication_lifecycle_early_close", "users_lifecycle_early_close")
+	connector := newLifecycleConnector(ctx, t)
 
 	go connector.Start(ctx)
 
@@ -86,7 +92,7 @@ func waitForConnectorReady(ctx context.Context, t *testing.T, connector cdc.Conn
 	require.NoError(t, connector.WaitUntilReady(readyCtx))
 }
 
-func newLifecycleConnector(ctx context.Context, t *testing.T, slotName, publicationName, tableName string) cdc.Connector {
+func newLifecycleConnector(ctx context.Context, t *testing.T) cdc.Connector {
 	t.Helper()
 
 	db, err := sql.Open("postgres", fmt.Sprintf(
@@ -101,7 +107,7 @@ func newLifecycleConnector(ctx context.Context, t *testing.T, slotName, publicat
 			id SERIAL PRIMARY KEY,
 			name TEXT NOT NULL
 		)
-	`, tableName))
+	`, lifecycleTableName))
 	require.NoError(t, err)
 
 	postgresPort, err := strconv.Atoi(Infra.PostgresPort)
@@ -117,7 +123,7 @@ func newLifecycleConnector(ctx context.Context, t *testing.T, slotName, publicat
 			DebugMode: false,
 			Publication: publication.Config{
 				CreateIfNotExists: true,
-				Name:              publicationName,
+				Name:              lifecyclePublicationName,
 				Operations: publication.Operations{
 					publication.OperationInsert,
 					publication.OperationDelete,
@@ -125,14 +131,14 @@ func newLifecycleConnector(ctx context.Context, t *testing.T, slotName, publicat
 				},
 				Tables: publication.Tables{
 					publication.Table{
-						Name:            tableName,
+						Name:            lifecycleTableName,
 						ReplicaIdentity: publication.ReplicaIdentityFull,
 					},
 				},
 			},
 			Slot: slot.Config{
 				CreateIfNotExists:           true,
-				Name:                        slotName,
+				Name:                        lifecycleSlotName,
 				SlotActivityCheckerInterval: 3000,
 			},
 			Logger: cdcconfig.LoggerConfig{
@@ -141,7 +147,7 @@ func newLifecycleConnector(ctx context.Context, t *testing.T, slotName, publicat
 		},
 		Elasticsearch: config.Elasticsearch{
 			TableIndexMapping: map[string]string{
-				fmt.Sprintf("public.%s", tableName): fmt.Sprintf("%s.test", tableName),
+				fmt.Sprintf("public.%s", lifecycleTableName): fmt.Sprintf("%s.test", lifecycleTableName),
 			},
 			BatchTickerDuration:         time.Millisecond * 100,
 			BatchSizeLimit:              10,
