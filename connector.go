@@ -36,17 +36,20 @@ type connector struct {
 	cfg             *config.Config
 	esClient        *es.Client
 	readyCh         chan struct{}
+	closedCh        chan struct{}
 	partitionCache  sync.Map
 	metrics         []prometheus.Collector
+	closeOnce       sync.Once
 }
 
 func NewConnector(ctx context.Context, cfg config.Config, handler Handler, options ...Option) (Connector, error) {
 	cfg.SetDefault()
 
 	esConnector := &connector{
-		cfg:     &cfg,
-		handler: handler,
-		readyCh: make(chan struct{}, 1),
+		cfg:      &cfg,
+		handler:  handler,
+		readyCh:  make(chan struct{}, 1),
+		closedCh: make(chan struct{}),
 	}
 
 	Options(options).Apply(esConnector)
@@ -87,7 +90,7 @@ func (c *connector) Start(ctx context.Context) {
 		c.bulk.StartBulk()
 
 		// Signal ready immediately since there's no CDC to wait for
-		c.readyCh <- struct{}{}
+		c.signalReady()
 
 		// Start CDC synchronously - it will execute snapshot and return
 		c.cdc.Start(ctx)
@@ -96,34 +99,80 @@ func (c *connector) Start(ctx context.Context) {
 	}
 
 	// Normal CDC mode: async flow
-	go func() {
-		logger.Info("waiting for connector start...")
-		if err := c.cdc.WaitUntilReady(ctx); err != nil {
-			panic(err)
+	go c.runUntilReady(ctx)
+	go c.runCDC(ctx)
+}
+
+func (c *connector) runUntilReady(ctx context.Context) {
+	logger.Info("waiting for connector start...")
+	if err := c.cdc.WaitUntilReady(ctx); err != nil {
+		if c.isClosed() {
+			return
 		}
-		logger.Info("bulk process started")
-		c.bulk.StartBulk()
-		c.readyCh <- struct{}{}
+		panic(err)
+	}
+	if c.isClosed() {
+		return
+	}
+	logger.Info("bulk process started")
+	c.bulk.StartBulk()
+	c.signalReady()
+}
+
+func (c *connector) runCDC(ctx context.Context) {
+	defer func() {
+		if r := recover(); r != nil && !c.isClosed() {
+			panic(r)
+		}
 	}()
 	c.cdc.Start(ctx)
 }
 
 func (c *connector) WaitUntilReady(ctx context.Context) error {
 	select {
+	case <-c.closedCh:
+		return errors.New("connector closed")
+	default:
+	}
+
+	select {
 	case <-c.readyCh:
 		return nil
+	case <-c.closedCh:
+		return errors.New("connector closed")
 	case <-ctx.Done():
 		return ctx.Err()
 	}
 }
 
+func (c *connector) isClosed() bool {
+	select {
+	case <-c.closedCh:
+		return true
+	default:
+		return false
+	}
+}
+
 func (c *connector) Close() {
-	if !isClosed(c.readyCh) {
-		close(c.readyCh)
+	c.closeOnce.Do(func() {
+		close(c.closedCh)
+
+		c.cdc.Close()
+		c.bulk.Close()
+	})
+}
+
+func (c *connector) signalReady() {
+	if c.isClosed() {
+		return
 	}
 
-	c.cdc.Close()
-	c.bulk.Close()
+	select {
+	case <-c.closedCh:
+		return
+	case c.readyCh <- struct{}{}:
+	}
 }
 
 func (c *connector) listener(ctx *replication.ListenerContext) {
@@ -246,14 +295,4 @@ func (c *connector) findParentTable(tableNamespace, tableName string) string {
 	}
 
 	return ""
-}
-
-func isClosed[T any](ch <-chan T) bool {
-	select {
-	case <-ch:
-		return true
-	default:
-	}
-
-	return false
 }
