@@ -105,6 +105,7 @@ func main() {
 		Elasticsearch: config.Elasticsearch{
 			Username:                    "elastic",
 			Password:                    "es_cdc_es_pass",
+			MaxIdemponentCallAttempts:   1,
 			BatchSizeLimit:              10000,
 			BatchTickerDuration:         time.Millisecond * 100,
 			DisableDiscoverNodesOnStart: true,

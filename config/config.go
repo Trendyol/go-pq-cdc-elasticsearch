@@ -13,6 +13,7 @@ type Elasticsearch struct {
 	TableIndexMapping           map[string]string `yaml:"tableIndexMapping"`
 	MaxConnsPerHost             *int              `yaml:"maxConnsPerHost"`
 	MaxIdleConnDuration         *time.Duration    `yaml:"maxIdleConnDuration"`
+	MaxIdemponentCallAttempts   int               `yaml:"maxIdemponentCallAttempts"`
 	DiscoverNodesInterval       *time.Duration    `yaml:"discoverNodesInterval"`
 	TypeName                    string            `yaml:"typeName"`
 	Version                     string            `yaml:"version"`
