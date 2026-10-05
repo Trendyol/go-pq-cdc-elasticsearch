@@ -94,6 +94,7 @@ func main() {
 			CompressionEnabled:          false,
 			MaxConnsPerHost:             &[]int{10}[0],
 			MaxIdleConnDuration:         &[]time.Duration{30 * time.Second}[0],
+			MaxIdemponentCallAttempts:   1,
 		},
 	}
 
