@@ -69,6 +69,14 @@ func Handler(msg cdc.Message) []elasticsearch.Action {
 }
 ```
 
+The handler also receives PostgreSQL relation messages when the upstream CDC
+connector reports table metadata. Check `msg.Type.IsRelation()` and read the
+complete `*format.Relation` value from `msg.Relation` (including its columns,
+OID, and replica identity). Relation messages have no row data or event time.
+They are delivered to the handler even when their table has no Elasticsearch
+index mapping; return no actions if the metadata does not require an
+Elasticsearch write.
+
 For detailed configuration and usage, see the [snapshot example](./example/snapshot).
 
 ### Usage

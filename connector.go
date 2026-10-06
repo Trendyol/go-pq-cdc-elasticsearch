@@ -137,8 +137,23 @@ func (c *connector) listener(ctx *replication.ListenerContext) {
 		msg = NewDeleteMessage(c.esClient, m)
 	case *format.Snapshot:
 		msg = NewSnapshotMessage(c.esClient, m)
+	case *format.Relation:
+		msg = NewRelationMessage(c.esClient, m)
 	default:
 		return
+	}
+
+	var actions []elasticsearch.Action
+	if msg.Type.IsRelation() {
+		// Relation messages describe table metadata and may be useful to handlers
+		// even when the table is not mapped to an Elasticsearch index.
+		actions = c.handler(msg)
+		if len(actions) == 0 {
+			if err := ctx.Ack(); err != nil {
+				logger.Error("ack", "error", err)
+			}
+			return
+		}
 	}
 
 	fullTableName := c.getFullTableName(msg.TableNamespace, msg.TableName)
@@ -151,12 +166,14 @@ func (c *connector) listener(ctx *replication.ListenerContext) {
 		return
 	}
 
-	actions := c.handler(msg)
-	if len(actions) == 0 {
-		if err := ctx.Ack(); err != nil {
-			logger.Error("ack", "error", err)
+	if !msg.Type.IsRelation() {
+		actions = c.handler(msg)
+		if len(actions) == 0 {
+			if err := ctx.Ack(); err != nil {
+				logger.Error("ack", "error", err)
+			}
+			return
 		}
-		return
 	}
 
 	batchSizeLimit := c.cfg.Elasticsearch.BatchSizeLimit
