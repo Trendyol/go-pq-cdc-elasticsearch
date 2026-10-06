@@ -14,8 +14,9 @@ type Message struct {
 	TableName           string
 	TableNamespace      string
 
-	OldData map[string]any
-	NewData map[string]any
+	OldData  map[string]any
+	NewData  map[string]any
+	Relation *format.Relation
 
 	Type MessageType
 }
@@ -68,6 +69,16 @@ func NewSnapshotMessage(esClient *elasticsearch.Client, m *format.Snapshot) Mess
 	}
 }
 
+func NewRelationMessage(esClient *elasticsearch.Client, m *format.Relation) Message {
+	return Message{
+		ElasticsearchClient: esClient,
+		TableName:           m.Name,
+		TableNamespace:      m.Namespace,
+		Relation:            m,
+		Type:                RelationMessage,
+	}
+}
+
 type MessageType string
 
 const (
@@ -75,9 +86,11 @@ const (
 	UpdateMessage   MessageType = "UPDATE"
 	DeleteMessage   MessageType = "DELETE"
 	SnapshotMessage MessageType = "SNAPSHOT"
+	RelationMessage MessageType = "RELATION"
 )
 
 func (m MessageType) IsInsert() bool   { return m == InsertMessage }
 func (m MessageType) IsUpdate() bool   { return m == UpdateMessage }
 func (m MessageType) IsDelete() bool   { return m == DeleteMessage }
 func (m MessageType) IsSnapshot() bool { return m == SnapshotMessage }
+func (m MessageType) IsRelation() bool { return m == RelationMessage }
