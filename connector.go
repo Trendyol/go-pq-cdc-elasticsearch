@@ -126,18 +126,28 @@ func (c *connector) Close() {
 	c.bulk.Close()
 }
 
-func (c *connector) listener(ctx *replication.ListenerContext) {
+func newMessage(esClient *es.Client, ctx *replication.ListenerContext) (Message, bool) {
 	var msg Message
 	switch m := ctx.Message.(type) {
 	case *format.Insert:
-		msg = NewInsertMessage(c.esClient, m)
+		msg = NewInsertMessage(esClient, m)
 	case *format.Update:
-		msg = NewUpdateMessage(c.esClient, m)
+		msg = NewUpdateMessage(esClient, m)
 	case *format.Delete:
-		msg = NewDeleteMessage(c.esClient, m)
+		msg = NewDeleteMessage(esClient, m)
 	case *format.Snapshot:
-		msg = NewSnapshotMessage(c.esClient, m)
+		msg = NewSnapshotMessage(esClient, m)
 	default:
+		return Message{}, false
+	}
+
+	msg.TransactionID = ctx.Xid
+	return msg, true
+}
+
+func (c *connector) listener(ctx *replication.ListenerContext) {
+	msg, ok := newMessage(c.esClient, ctx)
+	if !ok {
 		return
 	}
 
