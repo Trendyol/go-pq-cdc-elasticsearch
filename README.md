@@ -14,6 +14,7 @@ go-pq-cdc-elasticsearch streams documents from PostgreSql and writes to Elastics
 | [Availability](#availability) | High availability setup |
 | [Configuration](#configuration) | All configuration options |
 | [API](#api) | REST API endpoints |
+| [Change Metadata](#change-metadata) | LSN and transaction ID on each message |
 | [Exposed Metrics](#exposed-metrics) | Prometheus metrics |
 | [Compatibility](#compatibility) | Version compatibility |
 | [Breaking Changes](#breaking-changes) | Breaking changes log |
@@ -249,6 +250,24 @@ This setup ensures continuous data synchronization and minimal downtime in captu
 | `GET /status`        | Returns a 200 OK status if the client is able to ping the PostgreSQL server successfully. |
 | `GET /metrics`       | Prometheus metric endpoint.                                                               |
 | `GET /debug/pprof/*` | (Only for `debugMode=true`) [pprof](https://pkg.go.dev/net/http/pprof)                    |
+
+### Change Metadata
+
+`cdc.Message.LSN` is the WAL position of the change. It increases with every change to a given row, so a sink can store it with each document and skip any event whose LSN is not greater than the stored one (a stale or re-sent change). Snapshot events carry the LSN the snapshot was taken at, shared by every snapshot row.
+
+`cdc.Message.TransactionID` is the top-level transaction that produced the change, and `0` for snapshot events. Rows changed in one transaction share it, so it groups changes. It is 32-bit and wraps around, so use `LSN` to order changes, not `TransactionID`.
+
+Compare `LSN` as a number: `LSN.String()` returns PostgreSQL's `X/X` form, which does not sort as text.
+
+```go
+func Handler(msg cdc.Message) []elasticsearch.Action {
+	id := []byte(strconv.Itoa(int(msg.NewData["id"].(int32)))) // insert/update; use OldData on delete
+	if uint64(msg.LSN) <= storedLSN(id) { // LSN saved with the document, 0 if none
+		return nil // stale or duplicate change
+	}
+	// ... build the action and store uint64(msg.LSN) with the document
+}
+```
 
 ### Exposed Metrics
 
