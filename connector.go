@@ -148,24 +148,25 @@ func newMessage(esClient *es.Client, ctx *replication.ListenerContext) (Message,
 func (c *connector) listener(ctx *replication.ListenerContext) {
 	msg, ok := newMessage(c.esClient, ctx)
 	if !ok {
+		// Relation, Truncate and logical decoding messages carry no row to
+		// index, but every delivered message must still be acked.
+		c.bulk.AckWhenFlushed(ctx)
 		return
 	}
 
 	fullTableName := c.getFullTableName(msg.TableNamespace, msg.TableName)
 
 	indexName := c.resolveTableToIndexName(fullTableName, msg.TableNamespace, msg.TableName)
+	// A message without actions is acked through the bulk so that its ack
+	// cannot overtake actions of earlier messages that are not flushed yet.
 	if indexName == "" {
-		if err := ctx.Ack(); err != nil {
-			logger.Error("ack", "error", err)
-		}
+		c.bulk.AckWhenFlushed(ctx)
 		return
 	}
 
 	actions := c.handler(msg)
 	if len(actions) == 0 {
-		if err := ctx.Ack(); err != nil {
-			logger.Error("ack", "error", err)
-		}
+		c.bulk.AckWhenFlushed(ctx)
 		return
 	}
 
