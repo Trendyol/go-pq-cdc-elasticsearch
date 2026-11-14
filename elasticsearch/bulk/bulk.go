@@ -36,6 +36,9 @@ type Indexer interface {
 		indexName string,
 		isLastChunk bool,
 	)
+	// AckWhenFlushed acks a message that produced no actions once every
+	// message delivered before it has been flushed to Elasticsearch.
+	AckWhenFlushed(ctx *replication.ListenerContext)
 	GetMetric() Metric
 	Close()
 }
@@ -48,10 +51,10 @@ type Bulk struct {
 	batchTicker         *time.Ticker
 	isClosed            chan bool
 	esClient            *elasticsearch.Client
-	lastAckCtx          *replication.ListenerContext
 	readers             []*bytes.MultiDimensionReader
 	typeName            []byte
 	batch               []BatchItem
+	pendingAcks         []*replication.ListenerContext // acked in delivery order by the next flush
 	batchIndex          int
 	batchSize           int
 	batchSizeLimit      int
@@ -157,11 +160,15 @@ func (b *Bulk) AddActions(
 		}
 	}
 	if isLastChunk {
-		b.lastAckCtx = ctx
+		// A message is complete once its last chunk is in the batch.
+		b.queueAck(ctx)
 	}
 
-	// Check if we need to flush while still holding the lock
-	shouldFlush := b.batchSize >= b.batchSizeLimit || b.batchByteSize >= b.batchByteSizeLimit
+	// Check if we need to flush while still holding the lock. Queued acks count
+	// too: updates to one document collapse into a single action, but every
+	// message stays referenced until the flush that acks it.
+	shouldFlush := b.batchSize >= b.batchSizeLimit || b.batchByteSize >= b.batchByteSizeLimit ||
+		len(b.pendingAcks) >= b.batchSizeLimit
 
 	b.flushLock.Unlock()
 
@@ -170,6 +177,61 @@ func (b *Bulk) AddActions(
 	}
 	if shouldFlush {
 		b.flushMessages()
+	}
+}
+
+// AckWhenFlushed acks a message that produced no actions: a non-DML message,
+// a table without an index mapping, or a handler that returned no actions.
+// Acking it straight away could confirm a position past messages whose
+// actions are still waiting in the batch, so it is queued behind them and
+// acked by the flush that sends them. With nothing pending it is acked now.
+// Queued acks count toward batchSizeLimit like actions do.
+func (b *Bulk) AckWhenFlushed(ctx *replication.ListenerContext) {
+	if b.ackOrQueue(ctx) {
+		b.flushMessages()
+	}
+}
+
+// ackOrQueue acks ctx now when nothing is waiting to be flushed and queues it
+// otherwise. It reports whether the queue reached batchSizeLimit, in which case
+// the caller flushes once the lock is released, as AddActions does.
+func (b *Bulk) ackOrQueue(ctx *replication.ListenerContext) (shouldFlush bool) {
+	b.flushLock.Lock()
+	defer b.flushLock.Unlock()
+
+	if len(b.batch) == 0 && len(b.pendingAcks) == 0 {
+		ack(ctx)
+		return false
+	}
+	b.queueAck(ctx)
+	return len(b.pendingAcks) >= b.batchSizeLimit
+}
+
+// queueAck appends ctx to the acks sent by the next flush, keeping delivery
+// order. The caller must hold flushLock.
+func (b *Bulk) queueAck(ctx *replication.ListenerContext) {
+	if ctx == nil {
+		return
+	}
+	b.pendingAcks = append(b.pendingAcks, ctx)
+}
+
+// ackPending acks every queued message in delivery order and releases them.
+// The caller must hold flushLock.
+func (b *Bulk) ackPending() {
+	for i, ctx := range b.pendingAcks {
+		ack(ctx)
+		b.pendingAcks[i] = nil
+	}
+	b.pendingAcks = b.pendingAcks[:0]
+}
+
+func ack(ctx *replication.ListenerContext) {
+	if ctx == nil || ctx.Ack == nil {
+		return
+	}
+	if err := ctx.Ack(); err != nil {
+		logger.Error("ack", "error", err)
 	}
 }
 
@@ -268,29 +330,33 @@ func (b *Bulk) flushMessages() {
 		b.batchIndex = 0
 		b.batchSize = 0
 		b.batchByteSize = 0
-		if b.lastAckCtx != nil {
-			if err = b.lastAckCtx.Ack(); err != nil {
-				logger.Error("ack", "error", err)
-			}
-			b.lastAckCtx = nil
-		}
 	}
+	// Each queued message has its own actions, and those of every message
+	// delivered before it, in the batch just sent (or had none), so its ack
+	// can no longer overtake an unflushed message.
+	b.ackPending()
 }
 
 func (b *Bulk) requestFunc(concurrentRequestIndex int, batchItems []BatchItem) func() error {
 	return func() error {
 		reader := b.readers[concurrentRequestIndex]
 		reader.Reset(getBytes(batchItems))
+		actions := getActions(batchItems)
 		r, err := b.esClient.Bulk(reader)
 		if err != nil {
+			b.handleRequestError(actions, err)
 			return err
 		}
-		errorData, err := hasResponseError(r)
-		b.handleResponse(getActions(batchItems), errorData)
-		if err != nil {
+		errorData, err := hasResponseError(r, len(actions))
+		if err != nil && errorData == nil {
+			// The request failed as a whole (non-2xx status, a body that is not a
+			// bulk response, or items that cannot be matched to the actions), so
+			// no action in it can be reported as indexed.
+			b.handleRequestError(actions, err)
 			return err
 		}
-		return nil
+		b.handleResponse(actions, errorData)
+		return err
 	}
 }
 
@@ -318,7 +384,10 @@ func (b *Bulk) GetMetric() Metric {
 	return b.metric
 }
 
-func hasResponseError(r *esapi.Response) (map[string]string, error) {
+// hasResponseError reads a bulk response. It returns the error text of every
+// failed item, keyed by the position of its action in the request, or only an
+// error when the request failed as a whole.
+func hasResponseError(r *esapi.Response, actionCount int) (map[int]string, error) {
 	if r == nil {
 		return nil, fmt.Errorf("esapi response is nil")
 	}
@@ -338,43 +407,54 @@ func hasResponseError(r *esapi.Response) (map[string]string, error) {
 		return nil, err
 	}
 	hasError, ok := b["errors"].(bool)
-	if !ok || !hasError {
+	if !ok {
+		// Not a bulk response (e.g. a proxy answering for Elasticsearch): no
+		// action in the request can be reported as indexed.
+		return nil, fmt.Errorf("bulk response errors field is %T, not a bool", b["errors"])
+	}
+	if !hasError {
 		return nil, nil
 	}
-	return joinErrors(b)
+	return joinErrors(b, actionCount)
 }
 
-func joinErrors(body map[string]any) (map[string]string, error) {
-	var sb strings.Builder
-	ivd := make(map[string]string)
-	sb.WriteString("bulk request has error. Errors will be listed below:\n")
-
-	items, ok := body["items"].([]any)
-	if !ok {
-		return nil, nil
+// joinErrors matches the items of a bulk response to the request's actions by
+// position: Elasticsearch returns one item per action, in request order. When
+// the items cannot be matched that way, the whole request is failed.
+func joinErrors(body map[string]any, actionCount int) (map[int]string, error) {
+	items, _ := body["items"].([]any)
+	if len(items) != actionCount {
+		return nil, fmt.Errorf("bulk response item count %d does not match action count %d", len(items), actionCount)
 	}
 
-	for _, i := range items {
-		item, ok := i.(map[string]any)
-		if !ok {
+	var sb strings.Builder
+	itemErrors := make(map[int]string)
+	sb.WriteString("bulk request has error. Errors will be listed below:\n")
+	for i, item := range items {
+		if !itemFailed(item) {
 			continue
 		}
+		itemValue := fmt.Sprintf("%v\n", item)
+		sb.WriteString(itemValue)
+		itemErrors[i] = itemValue
+	}
+	return itemErrors, fmt.Errorf("%s", sb.String())
+}
 
-		for _, v := range item {
-			iv, ok := v.(map[string]any)
-			if !ok {
-				continue
-			}
-
-			if iv["error"] != nil {
-				itemValue := fmt.Sprintf("%v\n", i)
-				sb.WriteString(itemValue)
-				itemValueDataKey := fmt.Sprintf("%s:%s", iv["_id"].(string), iv["_index"].(string))
-				ivd[itemValueDataKey] = itemValue
-			}
+// itemFailed reports whether a bulk response item failed. An item that does not
+// hold an operation result object cannot be read as a success.
+func itemFailed(item any) bool {
+	operations, ok := item.(map[string]any)
+	if !ok || len(operations) == 0 {
+		return true
+	}
+	for _, v := range operations {
+		result, ok := v.(map[string]any)
+		if !ok || result["error"] != nil {
+			return true
 		}
 	}
-	return ivd, fmt.Errorf("%s", sb.String())
+	return false
 }
 
 func (b *Bulk) getIndexName(indexName, actionIndexName string) string {
@@ -389,23 +469,40 @@ func (b *Bulk) getIndexName(indexName, actionIndexName string) string {
 	return indexName
 }
 
-func (b *Bulk) handleResponse(batchActions []*elasticsearch2.Action, errs map[string]string) {
+func (b *Bulk) handleResponse(batchActions []*elasticsearch2.Action, errs map[int]string) {
 	if b.responseHandler == nil {
 		return
 	}
 
-	for _, a := range batchActions {
-		key := getActionKey(*a)
-		if _, ok := errs[key]; ok {
+	for i, a := range batchActions {
+		// errs is keyed by position: response items follow the request order.
+		if itemErr, ok := errs[i]; ok {
 			b.responseHandler.OnError(&elasticsearch2.ResponseHandlerContext{
 				Action: a,
-				Err:    fmt.Errorf("%s", errs[key]),
+				Err:    fmt.Errorf("%s", itemErr),
 			})
 			continue
 		}
 
 		b.responseHandler.OnSuccess(&elasticsearch2.ResponseHandlerContext{
 			Action: a,
+		})
+	}
+}
+
+// handleRequestError reports every action of a bulk request that failed as a
+// whole (transport error, non-2xx response, or a response that cannot be read
+// as a bulk result) to the response handler as an error: none of them can be
+// assumed indexed.
+func (b *Bulk) handleRequestError(batchActions []*elasticsearch2.Action, err error) {
+	if b.responseHandler == nil {
+		return
+	}
+
+	for _, a := range batchActions {
+		b.responseHandler.OnError(&elasticsearch2.ResponseHandlerContext{
+			Action: a,
+			Err:    err,
 		})
 	}
 }
