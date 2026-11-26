@@ -9,6 +9,7 @@ go-pq-cdc-elasticsearch streams documents from PostgreSql and writes to Elastics
 | Section | Description |
 |---------|-------------|
 | [Snapshot Feature](#-snapshot-feature) | Initial data synchronization before CDC |
+| [Destination Routing](#destination-routing) | Per-row Elasticsearch index via handler |
 | [Usage](#usage) | How to use the connector |
 | [Examples](#examples) | Code examples |
 | [Availability](#availability) | High availability setup |
@@ -71,6 +72,32 @@ func Handler(msg cdc.Message) []elasticsearch.Action {
 ```
 
 For detailed configuration and usage, see the [snapshot example](./example/snapshot).
+
+## Destination Routing
+
+Index each row into an **Elasticsearch index** chosen in your handler. The connector resolves a default index from `elasticsearch.tableIndexMapping`, then applies any non-empty `IndexName` on each action (handler wins).
+
+```go
+func Handler(msg cdc.Message) []elasticsearch.Action {
+	id := []byte(strconv.Itoa(int(msg.NewData["id"].(int32))))
+	body, _ := json.Marshal(msg.NewData)
+
+	index := "orders"
+	if tenant, ok := msg.NewData["tenant"].(string); ok && tenant != "" {
+		index = "orders-" + tenant
+	}
+
+	act := elasticsearch.NewIndexAction(id, body, nil)
+	act.IndexName = index
+	return []elasticsearch.Action{act}
+}
+```
+
+`Action.Routing` is the Elasticsearch **`_routing`** shard key for co-location within an index; it is not destination routing. Set `IndexName` for which index receives the document.
+
+You still need `tableIndexMapping` for the source table (for example `public.orders: orders`).
+
+📚 **[Full documentation](https://github.com/Trendyol/go-pq-cdc/blob/main/docs/DESTINATION_ROUTING.md)** (resolution order, limits).
 
 ### Usage
 
@@ -229,7 +256,7 @@ This setup ensures continuous data synchronization and minimal downtime in captu
 | `cdc.snapshot.tables`                                                                        |      []Table      |              no*              |    -    | Tables to snapshot (required for `snapshot_only` mode, optional for `initial` mode)                   | **snapshot_only:** Must be specified here (independent from publication). <br> **initial:** If specified, must be a subset of publication tables. If not specified, all publication tables are snapshotted. |
 | `elasticsearch.username`                                                                     |      string       | no (yes, if the auth enabled) |    -    | The username for authenticating to Elasticsearch.                                                     | Maps table names to Elasticsearch indices.                                                                                                                               |
 | `elasticsearch.password`                                                                     |      string       | no (yes, if the auth enabled) |    -    | The password associated with the elasticsearch.username for authenticating to Elasticsearch.          | Maps table names to Elasticsearch indices.                                                                                                                               |
-| `elasticsearch.tableIndexMapping`                                                            | map[string]string |              yes              |    -    | Mapping of PostgreSQL table events to Elasticsearch indices                                           | Maps table names to Elasticsearch indices.                                                                                                                               |
+| `elasticsearch.tableIndexMapping`                                                            | map[string]string |              yes              |    -    | Mapping of PostgreSQL table events to Elasticsearch indices                                           | Default index per table; used when the handler leaves `IndexName` empty on an action. Handler-set `IndexName` overrides this for that action.                                                          |
 | `elasticsearch.urls`                                                                         |     []string      |              yes              |    -    | Elasticsearch connection URLs                                                                         | List of URLs to connect to Elasticsearch instances.                                                                                                                      |
 | `elasticsearch.batchSizeLimit`                                                               |        int        |              no               |  1000   | Maximum message count per batch                                                                       | Flush is triggered if this limit is exceeded.                                                                                                                            |
 | `elasticsearch.batchTickerDuration`                                                          |   time.Duration   |              no               | 10 sec  | Automatic batch flush interval                                                                        | Specify in a human-readable format, e.g., `10s` for 10 seconds.                                                                                                          |
